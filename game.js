@@ -60,6 +60,8 @@ const UI = {
 
 const W = canvas.width;
 const H = canvas.height;
+const BASE_WORLD_WIDTH = 1280;
+const WORLD_X_OFFSET = (W - BASE_WORLD_WIDTH) / 2;
 const ARENA = { left: 42, right: W - 42, top: 42, bottom: H - 42 };
 const PLAYER_RADIUS = 25;
 const WIN_SCORE = 3;
@@ -218,7 +220,7 @@ function createPlayer(id) {
   const isP1 = id === 1;
   return {
     id,
-    x: isP1 ? 180 : W - 180,
+    x: isP1 ? 180 + WORLD_X_OFFSET : W - 180 - WORLD_X_OFFSET,
     y: H / 2,
     color: isP1 ? "#39e7ff" : "#ff4d8d",
     darkColor: isP1 ? "#117e9b" : "#a62758",
@@ -244,7 +246,7 @@ function createPlayer(id) {
 
 const players = [createPlayer(1), createPlayer(2)];
 
-function createBot({ id, label, x = W - 190, y, color, darkColor, weaponIndex, fireDelay }) {
+function createBot({ id, label, x = W - 190 - WORLD_X_OFFSET, y, color, darkColor, weaponIndex, fireDelay }) {
   return {
     id,
     label,
@@ -304,7 +306,7 @@ function createCampaignBots(level) {
     levelBots.push(createBot({
       id: "bot-shotgun",
       label: "SHOTGUN AI",
-      x: W - 355,
+      x: W - 355 - WORLD_X_OFFSET,
       y: H - 150,
       color: "#ff8a4c",
       darkColor: "#843d24",
@@ -440,7 +442,7 @@ function currentWeaponState(player) {
 
 function resetPlayer(player) {
   const isP1 = player.id === 1;
-  player.x = isP1 ? 180 : W - 180;
+  player.x = isP1 ? 180 + WORLD_X_OFFSET : W - 180 - WORLD_X_OFFSET;
   player.y = H / 2;
   player.angle = isP1 ? 0 : Math.PI;
   player.health = 100;

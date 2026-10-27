@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b14" />
+    <title>Arena Duel · 双人对战与闯关</title>
+    <link rel="stylesheet" href="./styles.css?v=9" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <div>
+            <p class="eyebrow">LOCAL ARENA</p>
+            <h1>ARENA DUEL</h1>
+          </div>
+        </div>
+        <div id="roundInfo" class="round-info">
+          <span id="roundInfoLabel">先赢得</span>
+          <strong id="roundInfoValue">3</strong>
+          <span id="roundInfoSuffix">局获胜</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="modeButton" class="icon-button mode-button" type="button">模式：双人对战</button>
+          <button id="soundButton" class="icon-button" type="button" aria-label="切换声音">声音：开</button>
+        </div>
+      </header>
+
+      <section class="hud" aria-label="玩家状态">
+        <article class="player-card player-one">
+          <div class="player-heading">
+            <span id="p1Tag" class="player-tag">P1</span>
+            <span id="p1Weapon" class="weapon-name">脉冲手枪</span>
+            <span id="p1Score" class="score">0</span>
+          </div>
+          <div class="health-track">
+            <div id="p1Health" class="health-fill"></div>
+            <span id="p1HealthText" class="health-text">100%</span>
+          </div>
+          <div class="ammo-row">
+            <span id="p1Status">战斗就绪</span>
+            <strong id="p1Ammo">12 / ∞</strong>
+          </div>
+        </article>
+
+        <div class="versus">
+          <span id="roundLabel">ROUND 1</span>
+          <strong>VS</strong>
+          <time id="matchTimer">02:00</time>
+        </div>
+
+        <article class="player-card player-two">
+          <div class="player-heading">
+            <span id="p2Score" class="score">0</span>
+            <span id="p2Weapon" class="weapon-name">脉冲手枪</span>
+            <span id="p2Tag" class="player-tag">P2</span>
+          </div>
+          <div class="health-track">
+            <div id="p2Health" class="health-fill"></div>
+            <span id="p2HealthText" class="health-text">100%</span>
+          </div>
+          <div class="ammo-row">
+            <strong id="p2Ammo">12 / ∞</strong>
+            <span id="p2Status">战斗就绪</span>
+          </div>
+        </article>
+      </section>
+
+      <section id="arenaFrame" class="arena-frame">
+        <canvas id="gameCanvas" width="1280" height="720" tabindex="-1" aria-label="双人竞技场"></canvas>
+        <div id="modePanel" class="mode-panel hidden">
+          <div class="mode-dialog">
+            <div id="modeHome">
+              <p class="mode-eyebrow">SELECT MODE</p>
+              <h2>选择战斗模式</h2>
+              <div class="mode-options mode-options-two">
+                <button id="duelModeButton" class="mode-card duel-card" type="button">
+                  <span>双人对战</span>
+                  <strong>本地 1V1</strong>
+                  <small>先赢 3 局获胜</small>
+                </button>
+                <button id="campaignModeButton" class="mode-card level-card" type="button">
+                  <span>单人挑战</span>
+                  <strong>闯关模式</strong>
+                  <small>进入关卡选择</small>
+                </button>
+              </div>
+            </div>
+            <div id="levelSelect" class="hidden">
+              <p class="mode-eyebrow">CAMPAIGN</p>
+              <h2>选择闯关关卡</h2>
+              <div class="mode-options level-options">
+                <button id="level1Button" class="mode-card level-card" type="button">
+                  <span>第 1 关</span>
+                  <strong>双机夹击</strong>
+                  <small>绿色 AI + 黄色 AI</small>
+                  <small id="level1Best" class="best-time">最好成绩：--</small>
+                </button>
+                <button id="level2Button" class="mode-card level-card" type="button">
+                  <span>第 2 关</span>
+                  <strong>三机防线</strong>
+                  <small>增加一名黄色 AI</small>
+                  <small id="level2Best" class="best-time">最好成绩：--</small>
+                </button>
+                <button id="level3Button" class="mode-card level-card" type="button">
+                  <span>第 3 关</span>
+                  <strong>霰弹封锁</strong>
+                  <small>增加一名霰弹枪 AI</small>
+                  <small id="level3Best" class="best-time">最好成绩：--</small>
+                </button>
+              </div>
+              <button id="backModeButton" class="close-mode-button" type="button">← 返回模式选择</button>
+            </div>
+            <button id="closeModeButton" class="close-mode-button" type="button">继续当前游戏</button>
+          </div>
+        </div>
+        <div id="countdown" class="countdown hidden"></div>
+        <div id="resultPanel" class="result-panel hidden">
+          <p id="resultEyebrow">本局结束</p>
+          <h2 id="resultTitle">P1 获胜</h2>
+          <p id="resultText">准备好迎接下一局</p>
+          <button id="restartButton" type="button">再来一局 <span>R</span></button>
+        </div>
+        <div id="pausePanel" class="pause-panel hidden">
+          <span>PAUSED</span>
+          <p>按空格键继续</p>
+        </div>
+      </section>
+
+      <footer class="controls">
+        <div class="control-group p1-controls">
+          <span class="mini-tag">P1</span>
+          <span id="p1MovementHint"><kbd>WASD</kbd> 移动 / 瞄准</span>
+          <button id="campaignMovementButton" class="keymap-button campaign-keymap-button hidden" type="button" aria-label="切换闯关移动键位">
+            <span>闯关键位</span>
+            <strong id="campaignMovementKeys">WASD</strong>
+            <small>点击切换</small>
+          </button>
+          <span><kbd id="p1FireKey">左 Shift</kbd> 射击</span>
+          <span><kbd id="p1ReloadKey">E</kbd> 换弹</span>
+          <span><kbd id="p1SwitchKey">Q</kbd> 切换枪械</span>
+        </div>
+        <p id="controlsTip" class="tip">移动方向就是射击方向 · 打空弹夹会自动换弹</p>
+        <div id="p2Controls" class="control-group p2-controls">
+          <button id="p2MovementButton" class="keymap-button" type="button" aria-label="切换红方移动键位">
+            <span>红方移动</span>
+            <strong id="p2MovementKeys">OKL;</strong>
+            <small>点击切换</small>
+          </button>
+          <span><kbd>右 Shift</kbd> 射击</span>
+          <span><kbd>/</kbd> 换弹</span>
+          <span><kbd>Enter</kbd> 切换枪械</span>
+          <span class="mini-tag">P2</span>
+        </div>
+      </footer>
+    </main>
+
+    <script src="./game.js?v=9"></script>
+  </body>
+</html>

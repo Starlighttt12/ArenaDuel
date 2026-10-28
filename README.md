@@ -12,7 +12,9 @@ Open `index.html` directly, or run any static file server in this directory.
 
 ## Controls
 
-- Select **CONTROLS** in the upper-right corner, click an action, and press a keyboard key to rebind it.
+- Select **CONTROLS** in the upper-right corner, click an action, then press a keyboard key or mouse button to rebind it.
+- Supported pointer inputs are `Mouse Left`, `Mouse Right`, and `Mouse Middle`. A MacBook or Chromebook touchpad primary click is recognized as `Mouse Left`.
+- Holding an assigned mouse or touchpad button continuously activates actions such as firing or movement, just like holding a keyboard key.
 - Player 1 and Player 2 movement, firing, reloading, and weapon switching can all be configured individually. Pause and restart can also be rebound.
 - If a selected key is already assigned, the two actions automatically swap keys so one key never triggers multiple actions.
 - Custom settings are saved in the browser and apply to both Duel and Campaign. The control panel can restore all default bindings.

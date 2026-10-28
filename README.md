@@ -1,55 +1,58 @@
 # Arena Duel
 
-一个无需安装依赖、打开浏览器即可玩的本地双人 PvP 射击游戏。
+A dependency-free local two-player PvP shooter that runs directly in the browser.
 
-现在也支持包含 3 个完整关卡的闯关模式。
+It also includes a three-level single-player campaign.
 
-游戏世界尺寸为 `1440 × 720`。高度和所有角色、子弹、障碍物尺寸保持不变，原有 `1280 × 720` 地图居中放置，并在左右两侧各增加 80 单位的实际可移动空间。页面会按浏览器宽度等比缩放，不产生横向滚动。
+The game world is `1440 × 720`. The original `1280 × 720` layout remains centered, with 80 units of real playable space added to both the left and right sides. The original height and all character, bullet, and obstacle sizes remain unchanged. The page scales to the browser width without horizontal scrolling.
 
-## 开始游戏
+## Getting Started
 
-直接双击 `index.html`，或在当前目录运行任意静态文件服务器。
+Open `index.html` directly, or run any static file server in this directory.
 
-## 操作
+## Controls
 
-- 玩家 1：`WASD` 移动/瞄准，`左 Shift` 射击，`E` 主动换弹，`Q` 切换枪械
-- 玩家 2：可在底部按钮选择 `OKL;` 或 `↑↓←→` 移动/瞄准，`右 Shift` 射击，`/` 主动换弹，`Enter` 切换枪械
-- `Space`：暂停
-- `R`：本局结束后进入下一局
+- Select **CONTROLS** in the upper-right corner, click an action, and press a keyboard key to rebind it.
+- Player 1 and Player 2 movement, firing, reloading, and weapon switching can all be configured individually. Pause and restart can also be rebound.
+- If a selected key is already assigned, the two actions automatically swap keys so one key never triggers multiple actions.
+- Custom settings are saved in the browser and apply to both Duel and Campaign. The control panel can restore all default bindings.
+- Default Player 1: `WASD` to move/aim, `Left Shift` to fire, `E` to reload, and `Q` to switch weapons.
+- Default Player 2: `OKL;` to move/aim, `Right Shift` to fire, `/` to reload, and `Enter` to switch weapons.
+- Default global controls: `Space` to pause and `R` to restart or continue.
 
-## 闯关模式
+## Campaign
 
-点击右上角的模式按钮后，先选择“双人对战”或“闯关模式”；选择闯关模式后再进入 1、2、3 关的关卡选择。所有关卡沿用双人模式的地图和障碍物。玩家 1 可在底部一键切换 `WASD + 左 Shift + E + Q` 或 `↑↓←→ + 右 Shift + / + Enter` 整套操作。
+Select the mode button in the upper-right corner, choose **DUEL** or **CAMPAIGN**, then select Campaign Level 1, 2, or 3. Every level uses the same arena and obstacles as Duel. Player 1's custom controls apply to every campaign level.
 
-- 第 1 关：绿色 AI + 黄色 AI。
-- 第 2 关：在第 1 关基础上增加一名黄色 AI，共 3 名 AI。
-- 第 3 关：在第 2 关基础上增加一名霰弹枪 AI，共 4 名 AI。霰弹枪 AI 每 2 秒发射一次 6 弹丸霰弹，使用 3 发弹夹和 2.25 秒换弹。
+- Level 1: Green AI + Yellow AI.
+- Level 2: Adds one Yellow AI for a total of three enemies.
+- Level 3: Adds one Shotgun AI for a total of four enemies. The Shotgun AI fires a six-pellet blast every two seconds and uses a three-round magazine with a 2.25-second reload.
 
-每关从 `FIGHT` 出现后开始正计时，精确到 0.1 秒。通关结算会显示本次用时，并为每一关分别保存最好成绩。
+The timer starts when `FIGHT` appears and is measured to 0.1 seconds. The results screen shows the completion time and saves a separate best time for every level.
 
-闯关模式中可在任何时刻按 `R`，立即重新开始当前关卡；双人对战中的 `R` 仍只在本局结束后生效。
+In Campaign, the configured restart key immediately restarts the current level. In Duel, it advances only after the round has ended.
 
-移动方向即角色朝向和射击方向。弹夹打空后会自动换弹，也可以在弹夹未空时主动换弹。每把枪会独立保存剩余弹药和换弹进度。
+Movement direction also controls aim direction. Empty magazines reload automatically, and players can reload early. Every weapon tracks its own ammunition and reload progress.
 
-## 场地道具
+## Arena Pickups
 
-每隔 10 秒，竞技场会在安全位置随机刷新一种道具：
+Every 10 seconds, one pickup appears at a safe random position:
 
-- 医疗包：立即恢复 30 点生命值，最高不超过 100
-- 攻击增幅：造成的伤害提高至原本的 150%，持续 10 秒
-- 无敌护盾：5 秒内不会受到任何伤害
-- 速度鞋：移动速度提高至原本的 120%，持续 10 秒
+- Medkit: Restores 30 health, up to 100.
+- Damage Boost: Increases damage to 150% for 10 seconds.
+- Invincibility Shield: Prevents all damage for 5 seconds.
+- Speed Boost: Increases movement speed to 120% for 10 seconds.
 
-场上最多同时存在 5 个未拾取的道具。
+The arena can contain up to five uncollected pickups.
 
-## 回合规则
+## Round Rules
 
-每局限时 2 分钟。若时间结束时双方都未阵亡，剩余血量较多的玩家获胜；血量相同则判为平局，本局不计分。
+Each round lasts two minutes. If time expires with both players alive, the player with more remaining health wins. Equal health results in a draw and awards no point.
 
-## 枪械
+## Weapons
 
-| 枪械 | 弹夹 | 换弹 | 单发伤害 | 特点 |
+| Weapon | Magazine | Reload | Damage | Notes |
 | --- | ---: | ---: | ---: | --- |
-| 脉冲手枪 | 12 | 1.15 秒 | 14 | 均衡、精准 |
-| 疾风冲锋枪 | 24 | 1.75 秒 | 7 | 射速快、散布略大 |
-| 破阵霰弹枪 | 3 | 2.25 秒 | 9 × 6 弹丸 | 近距离爆发 |
+| Pulse Pistol | 12 | 1.15 sec | 14 | Balanced and accurate |
+| Gale SMG | 24 | 1.75 sec | 7 | Fast fire rate with moderate spread |
+| Breach Shotgun | 3 | 2.25 sec | 9 × 6 pellets | High close-range burst damage |

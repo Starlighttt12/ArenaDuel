@@ -131,6 +131,11 @@ const BINDING_NAMES = {
   "global.restart": "Restart / Next Round",
 };
 const BINDING_IDS = Object.keys(BINDING_NAMES);
+const MOUSE_BUTTON_CODES = {
+  0: "MouseLeft",
+  1: "MouseMiddle",
+  2: "MouseRight",
+};
 
 function copyDefaultKeyBindings() {
   return {
@@ -251,6 +256,7 @@ let campaignWon = false;
 let stateBeforeModePanel = "countdown";
 let stateBeforeControlsPanel = "countdown";
 let activeBindingId = null;
+let suppressNextMouseClick = false;
 
 function createWeaponStates() {
   return weapons.map((weapon) => ({
@@ -397,6 +403,9 @@ function formatKeyCode(code) {
     Minus: "-",
     Equal: "=",
     Backquote: "`",
+    MouseLeft: "Mouse Left",
+    MouseRight: "Mouse Right",
+    MouseMiddle: "Mouse Middle",
   };
   if (labels[code]) return labels[code];
   if (code.startsWith("Key")) return code.slice(3);
@@ -452,7 +461,7 @@ function saveKeyBindings() {
   }
 }
 
-function stopListeningForBinding(message = "Click an action, then press a key") {
+function stopListeningForBinding(message = "Click an action, then press a keyboard key or mouse button") {
   activeBindingId = null;
   bindingButtons.forEach((button) => button.classList.remove("is-listening"));
   UI.bindingPrompt.classList.remove("is-listening");
@@ -466,7 +475,7 @@ function beginKeyBinding(bindingId) {
     button.classList.toggle("is-listening", button.dataset.binding === bindingId);
   });
   UI.bindingPrompt.classList.add("is-listening");
-  UI.bindingPrompt.textContent = `Setting “${BINDING_NAMES[bindingId]}” — press a key`;
+  UI.bindingPrompt.textContent = `Setting “${BINDING_NAMES[bindingId]}” — press a keyboard key or mouse button`;
 }
 
 function assignKeyBinding(bindingId, code) {
@@ -1674,6 +1683,24 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+function handleInputPress(inputCode) {
+  if (inputCode === players[0].switchKey) switchWeapon(players[0]);
+  if (gameMode === "duel" && inputCode === players[1].switchKey) switchWeapon(players[1]);
+  if (inputCode === players[0].reloadKey) beginReload(players[0]);
+  if (gameMode === "duel" && inputCode === players[1].reloadKey) beginReload(players[1]);
+  if (inputCode === keyBindings.global.restart) {
+    if (gameMode === "campaign") startCampaignLevel(campaignLevel);
+    else continueGame();
+  }
+  if (inputCode === keyBindings.global.pause && state !== "roundOver" && state !== "modeSelect") {
+    paused = !paused;
+    UI.pausePanel.classList.toggle("hidden", !paused);
+    if (!paused && state === "countdown") {
+      countdownStarted = performance.now();
+    }
+  }
+}
+
 window.addEventListener("keydown", (event) => {
   if (state === "controls") {
     event.preventDefault();
@@ -1684,25 +1711,47 @@ window.addEventListener("keydown", (event) => {
   const assignedKeys = BINDING_IDS.map((bindingId) => getBindingValue(keyBindings, bindingId));
   if (assignedKeys.includes(event.code)) event.preventDefault();
   keys.add(event.code);
-
-  if (!event.repeat && event.code === players[0].switchKey) switchWeapon(players[0]);
-  if (gameMode === "duel" && !event.repeat && event.code === players[1].switchKey) switchWeapon(players[1]);
-  if (!event.repeat && event.code === players[0].reloadKey) beginReload(players[0]);
-  if (gameMode === "duel" && !event.repeat && event.code === players[1].reloadKey) beginReload(players[1]);
-  if (!event.repeat && event.code === keyBindings.global.restart) {
-    if (gameMode === "campaign") startCampaignLevel(campaignLevel);
-    else continueGame();
-  }
-  if (!event.repeat && event.code === keyBindings.global.pause && state !== "roundOver" && state !== "modeSelect") {
-    paused = !paused;
-    UI.pausePanel.classList.toggle("hidden", !paused);
-    if (!paused && state === "countdown") {
-      countdownStarted = performance.now();
-    }
-  }
+  if (!event.repeat) handleInputPress(event.code);
 });
 
 window.addEventListener("keyup", (event) => keys.delete(event.code));
+window.addEventListener("mousedown", (event) => {
+  const mouseCode = MOUSE_BUTTON_CODES[event.button];
+  if (!mouseCode) return;
+  if (state === "controls") {
+    if (activeBindingId) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressNextMouseClick = event.button === 0;
+      assignKeyBinding(activeBindingId, mouseCode);
+    }
+    return;
+  }
+  if (!event.target?.closest?.("#arenaFrame")) return;
+  if (BINDING_IDS.some((bindingId) => getBindingValue(keyBindings, bindingId) === mouseCode)) {
+    event.preventDefault();
+  }
+  keys.add(mouseCode);
+  handleInputPress(mouseCode);
+});
+window.addEventListener("click", (event) => {
+  if (!suppressNextMouseClick) return;
+  suppressNextMouseClick = false;
+  event.preventDefault();
+  event.stopPropagation();
+}, true);
+window.addEventListener("mouseup", (event) => {
+  const mouseCode = MOUSE_BUTTON_CODES[event.button];
+  if (mouseCode) keys.delete(mouseCode);
+});
+window.addEventListener("contextmenu", (event) => {
+  const rightMouseIsAssigned = BINDING_IDS.some(
+    (bindingId) => getBindingValue(keyBindings, bindingId) === "MouseRight",
+  );
+  if (state === "controls" || (rightMouseIsAssigned && event.target?.closest?.("#arenaFrame"))) {
+    event.preventDefault();
+  }
+});
 window.addEventListener("blur", () => keys.clear());
 
 UI.restartButton.addEventListener("click", continueGame);

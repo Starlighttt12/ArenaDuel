@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080b14" />
-    <title>Arena Duel · 双人对战与闯关</title>
-    <link rel="stylesheet" href="./styles.css?v=10" />
+    <title>Arena Duel · Duel & Campaign</title>
+    <link rel="stylesheet" href="./styles.css?v=14" />
   </head>
   <body>
     <main class="game-shell">
@@ -18,21 +18,22 @@
           </div>
         </div>
         <div id="roundInfo" class="round-info">
-          <span id="roundInfoLabel">先赢得</span>
+          <span id="roundInfoLabel">FIRST TO</span>
           <strong id="roundInfoValue">3</strong>
-          <span id="roundInfoSuffix">局获胜</span>
+          <span id="roundInfoSuffix">WINS</span>
         </div>
         <div class="topbar-actions">
-          <button id="modeButton" class="icon-button mode-button" type="button">模式：双人对战</button>
-          <button id="soundButton" class="icon-button" type="button" aria-label="切换声音">声音：开</button>
+          <button id="controlsButton" class="icon-button controls-button" type="button">CONTROLS</button>
+          <button id="modeButton" class="icon-button mode-button" type="button">MODE: DUEL</button>
+          <button id="soundButton" class="icon-button" type="button" aria-label="Toggle sound">SOUND: ON</button>
         </div>
       </header>
 
-      <section class="hud" aria-label="玩家状态">
+      <section class="hud" aria-label="Player status">
         <article class="player-card player-one">
           <div class="player-heading">
             <span id="p1Tag" class="player-tag">P1</span>
-            <span id="p1Weapon" class="weapon-name">脉冲手枪</span>
+            <span id="p1Weapon" class="weapon-name">Pulse Pistol</span>
             <span id="p1Score" class="score">0</span>
           </div>
           <div class="health-track">
@@ -40,7 +41,7 @@
             <span id="p1HealthText" class="health-text">100%</span>
           </div>
           <div class="ammo-row">
-            <span id="p1Status">战斗就绪</span>
+            <span id="p1Status">READY</span>
             <strong id="p1Ammo">12 / ∞</strong>
           </div>
         </article>
@@ -54,7 +55,7 @@
         <article class="player-card player-two">
           <div class="player-heading">
             <span id="p2Score" class="score">0</span>
-            <span id="p2Weapon" class="weapon-name">脉冲手枪</span>
+            <span id="p2Weapon" class="weapon-name">Pulse Pistol</span>
             <span id="p2Tag" class="player-tag">P2</span>
           </div>
           <div class="health-track">
@@ -63,100 +64,137 @@
           </div>
           <div class="ammo-row">
             <strong id="p2Ammo">12 / ∞</strong>
-            <span id="p2Status">战斗就绪</span>
+            <span id="p2Status">READY</span>
           </div>
         </article>
       </section>
 
       <section id="arenaFrame" class="arena-frame">
-        <canvas id="gameCanvas" width="1440" height="720" tabindex="-1" aria-label="双人竞技场"></canvas>
+        <canvas id="gameCanvas" width="1440" height="720" tabindex="-1" aria-label="Arena Duel"></canvas>
         <div id="modePanel" class="mode-panel hidden">
           <div class="mode-dialog">
             <div id="modeHome">
               <p class="mode-eyebrow">SELECT MODE</p>
-              <h2>选择战斗模式</h2>
+              <h2>CHOOSE BATTLE MODE</h2>
               <div class="mode-options mode-options-two">
                 <button id="duelModeButton" class="mode-card duel-card" type="button">
-                  <span>双人对战</span>
-                  <strong>本地 1V1</strong>
-                  <small>先赢 3 局获胜</small>
+                  <span>DUEL</span>
+                  <strong>LOCAL 1V1</strong>
+                  <small>First to 3 wins</small>
                 </button>
                 <button id="campaignModeButton" class="mode-card level-card" type="button">
-                  <span>单人挑战</span>
-                  <strong>闯关模式</strong>
-                  <small>进入关卡选择</small>
+                  <span>SOLO CHALLENGE</span>
+                  <strong>CAMPAIGN</strong>
+                  <small>Choose a level</small>
                 </button>
               </div>
             </div>
             <div id="levelSelect" class="hidden">
               <p class="mode-eyebrow">CAMPAIGN</p>
-              <h2>选择闯关关卡</h2>
+              <h2>CHOOSE CAMPAIGN LEVEL</h2>
               <div class="mode-options level-options">
                 <button id="level1Button" class="mode-card level-card" type="button">
-                  <span>第 1 关</span>
-                  <strong>双机夹击</strong>
-                  <small>绿色 AI + 黄色 AI</small>
-                  <small id="level1Best" class="best-time">最好成绩：--</small>
+                  <span>LEVEL 1</span>
+                  <strong>CROSSFIRE</strong>
+                  <small>Green AI + Yellow AI</small>
+                  <small id="level1Best" class="best-time">BEST: --</small>
                 </button>
                 <button id="level2Button" class="mode-card level-card" type="button">
-                  <span>第 2 关</span>
-                  <strong>三机防线</strong>
-                  <small>增加一名黄色 AI</small>
-                  <small id="level2Best" class="best-time">最好成绩：--</small>
+                  <span>LEVEL 2</span>
+                  <strong>TRIPLE THREAT</strong>
+                  <small>Add one Yellow AI</small>
+                  <small id="level2Best" class="best-time">BEST: --</small>
                 </button>
                 <button id="level3Button" class="mode-card level-card" type="button">
-                  <span>第 3 关</span>
-                  <strong>霰弹封锁</strong>
-                  <small>增加一名霰弹枪 AI</small>
-                  <small id="level3Best" class="best-time">最好成绩：--</small>
+                  <span>LEVEL 3</span>
+                  <strong>SHOTGUN LOCKDOWN</strong>
+                  <small>Add one Shotgun AI</small>
+                  <small id="level3Best" class="best-time">BEST: --</small>
                 </button>
               </div>
-              <button id="backModeButton" class="close-mode-button" type="button">← 返回模式选择</button>
+              <button id="backModeButton" class="close-mode-button" type="button">← BACK TO MODE SELECT</button>
             </div>
-            <button id="closeModeButton" class="close-mode-button" type="button">继续当前游戏</button>
+            <button id="closeModeButton" class="close-mode-button" type="button">RESUME CURRENT GAME</button>
+          </div>
+        </div>
+        <div id="controlsPanel" class="controls-panel hidden">
+          <div class="controls-dialog">
+            <div class="controls-dialog-heading">
+              <div>
+                <p class="mode-eyebrow">KEY BINDINGS</p>
+                <h2>CUSTOMIZE CONTROLS</h2>
+              </div>
+              <button id="closeControlsButton" class="controls-close-button" type="button">DONE</button>
+            </div>
+            <p id="bindingPrompt" class="binding-prompt">Click an action, then press a key</p>
+            <div class="bindings-grid">
+              <section class="binding-section binding-section-p1">
+                <h3>PLAYER 1 / CAMPAIGN</h3>
+                <div class="binding-list">
+                  <button class="bind-key-button" data-binding="p1.up" type="button"><span>Move Up</span><kbd data-key-display="p1.up">W</kbd></button>
+                  <button class="bind-key-button" data-binding="p1.down" type="button"><span>Move Down</span><kbd data-key-display="p1.down">S</kbd></button>
+                  <button class="bind-key-button" data-binding="p1.left" type="button"><span>Move Left</span><kbd data-key-display="p1.left">A</kbd></button>
+                  <button class="bind-key-button" data-binding="p1.right" type="button"><span>Move Right</span><kbd data-key-display="p1.right">D</kbd></button>
+                  <button class="bind-key-button" data-binding="p1.fire" type="button"><span>Fire</span><kbd data-key-display="p1.fire">Left Shift</kbd></button>
+                  <button class="bind-key-button" data-binding="p1.reload" type="button"><span>Reload</span><kbd data-key-display="p1.reload">E</kbd></button>
+                  <button class="bind-key-button" data-binding="p1.switch" type="button"><span>Switch Weapon</span><kbd data-key-display="p1.switch">Q</kbd></button>
+                </div>
+              </section>
+              <section class="binding-section binding-section-p2">
+                <h3>PLAYER 2</h3>
+                <div class="binding-list">
+                  <button class="bind-key-button" data-binding="p2.up" type="button"><span>Move Up</span><kbd data-key-display="p2.up">O</kbd></button>
+                  <button class="bind-key-button" data-binding="p2.down" type="button"><span>Move Down</span><kbd data-key-display="p2.down">L</kbd></button>
+                  <button class="bind-key-button" data-binding="p2.left" type="button"><span>Move Left</span><kbd data-key-display="p2.left">K</kbd></button>
+                  <button class="bind-key-button" data-binding="p2.right" type="button"><span>Move Right</span><kbd data-key-display="p2.right">;</kbd></button>
+                  <button class="bind-key-button" data-binding="p2.fire" type="button"><span>Fire</span><kbd data-key-display="p2.fire">Right Shift</kbd></button>
+                  <button class="bind-key-button" data-binding="p2.reload" type="button"><span>Reload</span><kbd data-key-display="p2.reload">/</kbd></button>
+                  <button class="bind-key-button" data-binding="p2.switch" type="button"><span>Switch Weapon</span><kbd data-key-display="p2.switch">Enter</kbd></button>
+                </div>
+              </section>
+              <section class="binding-section binding-section-global">
+                <h3>ALL MODES</h3>
+                <div class="binding-list">
+                  <button class="bind-key-button" data-binding="global.pause" type="button"><span>Pause / Resume</span><kbd data-key-display="global.pause">Space</kbd></button>
+                  <button class="bind-key-button" data-binding="global.restart" type="button"><span>Restart / Next Round</span><kbd data-key-display="global.restart">R</kbd></button>
+                </div>
+                <button id="resetControlsButton" class="reset-controls-button" type="button">RESTORE DEFAULTS</button>
+                <p class="binding-note">Assigned keys automatically swap with the selected action. Settings are saved automatically.</p>
+              </section>
+            </div>
           </div>
         </div>
         <div id="countdown" class="countdown hidden"></div>
         <div id="resultPanel" class="result-panel hidden">
-          <p id="resultEyebrow">本局结束</p>
-          <h2 id="resultTitle">P1 获胜</h2>
-          <p id="resultText">准备好迎接下一局</p>
-          <button id="restartButton" type="button">再来一局 <span>R</span></button>
+          <p id="resultEyebrow">ROUND OVER</p>
+          <h2 id="resultTitle">P1 WINS</h2>
+          <p id="resultText">Get ready for the next round</p>
+          <button id="restartButton" type="button">PLAY AGAIN <span id="restartKeyHint">R</span></button>
         </div>
         <div id="pausePanel" class="pause-panel hidden">
           <span>PAUSED</span>
-          <p>按空格键继续</p>
+          <p>Press <kbd id="pauseKeyHint">Space</kbd> to resume</p>
+        </div>
+        <div class="controls arena-controls" aria-label="Control reference">
+          <div class="control-group p1-controls">
+            <span class="mini-tag">P1</span>
+            <span id="p1MovementHint"><kbd id="p1MovementKeys">W S A D</kbd> MOVE / AIM</span>
+            <span><kbd id="p1FireKey">Left Shift</kbd> FIRE</span>
+            <span><kbd id="p1ReloadKey">E</kbd> RELOAD</span>
+            <span><kbd id="p1SwitchKey">Q</kbd> SWITCH</span>
+          </div>
+          <p id="controlsTip" class="tip">Movement direction is aim direction · Empty magazines reload automatically</p>
+          <div id="p2Controls" class="control-group p2-controls">
+            <span><kbd id="p2MovementKeys">O L K ;</kbd> MOVE / AIM</span>
+            <span><kbd id="p2FireKey">Right Shift</kbd> FIRE</span>
+            <span><kbd id="p2ReloadKey">/</kbd> RELOAD</span>
+            <span><kbd id="p2SwitchKey">Enter</kbd> SWITCH</span>
+            <span class="mini-tag">P2</span>
+          </div>
         </div>
       </section>
-
-      <footer class="controls">
-        <div class="control-group p1-controls">
-          <span class="mini-tag">P1</span>
-          <span id="p1MovementHint"><kbd>WASD</kbd> 移动 / 瞄准</span>
-          <button id="campaignMovementButton" class="keymap-button campaign-keymap-button hidden" type="button" aria-label="切换闯关移动键位">
-            <span>闯关键位</span>
-            <strong id="campaignMovementKeys">WASD</strong>
-            <small>点击切换</small>
-          </button>
-          <span><kbd id="p1FireKey">左 Shift</kbd> 射击</span>
-          <span><kbd id="p1ReloadKey">E</kbd> 换弹</span>
-          <span><kbd id="p1SwitchKey">Q</kbd> 切换枪械</span>
-        </div>
-        <p id="controlsTip" class="tip">移动方向就是射击方向 · 打空弹夹会自动换弹</p>
-        <div id="p2Controls" class="control-group p2-controls">
-          <button id="p2MovementButton" class="keymap-button" type="button" aria-label="切换红方移动键位">
-            <span>红方移动</span>
-            <strong id="p2MovementKeys">OKL;</strong>
-            <small>点击切换</small>
-          </button>
-          <span><kbd>右 Shift</kbd> 射击</span>
-          <span><kbd>/</kbd> 换弹</span>
-          <span><kbd>Enter</kbd> 切换枪械</span>
-          <span class="mini-tag">P2</span>
-        </div>
-      </footer>
     </main>
 
-    <script src="./game.js?v=10"></script>
+    <script src="./game.js?v=14"></script>
   </body>
 </html>

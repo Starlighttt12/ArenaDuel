@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080b14" />
     <title>Arena Duel · Duel & Campaign</title>
-    <link rel="stylesheet" href="./styles.css?v=14" />
+    <link rel="stylesheet" href="./styles.css?v=15" />
   </head>
   <body>
     <main class="game-shell">
@@ -126,7 +126,7 @@
               </div>
               <button id="closeControlsButton" class="controls-close-button" type="button">DONE</button>
             </div>
-            <p id="bindingPrompt" class="binding-prompt">Click an action, then press a key</p>
+            <p id="bindingPrompt" class="binding-prompt">Click an action, then press a keyboard key or mouse button</p>
             <div class="bindings-grid">
               <section class="binding-section binding-section-p1">
                 <h3>PLAYER 1 / CAMPAIGN</h3>
@@ -159,7 +159,7 @@
                   <button class="bind-key-button" data-binding="global.restart" type="button"><span>Restart / Next Round</span><kbd data-key-display="global.restart">R</kbd></button>
                 </div>
                 <button id="resetControlsButton" class="reset-controls-button" type="button">RESTORE DEFAULTS</button>
-                <p class="binding-note">Assigned keys automatically swap with the selected action. Settings are saved automatically.</p>
+                <p class="binding-note">Supports keyboard, mouse, and touchpad clicks. Assigned inputs automatically swap and save.</p>
               </section>
             </div>
           </div>
@@ -195,6 +195,6 @@
       </section>
     </main>
 
-    <script src="./game.js?v=14"></script>
+    <script src="./game.js?v=15"></script>
   </body>
 </html>

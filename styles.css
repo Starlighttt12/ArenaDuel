@@ -53,7 +53,7 @@ button {
 .game-shell {
   width: min(1600px, calc(100% - 24px));
   margin: 0 auto;
-  padding: 18px 0 24px;
+  padding: 18px 0 0;
 }
 
 .topbar,
@@ -357,6 +357,152 @@ canvas {
   background: rgba(4, 6, 13, .88);
 }
 
+.controls-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: auto;
+  background: rgba(4, 6, 13, .94);
+  padding: 22px;
+  backdrop-filter: blur(10px);
+}
+
+.controls-dialog {
+  width: min(1040px, 100%);
+  margin: auto;
+}
+
+.controls-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.controls-dialog h2,
+.binding-section h3 {
+  margin: 0;
+  font-family: "Chakra Petch", "Noto Sans SC", sans-serif;
+}
+
+.controls-dialog h2 {
+  margin-top: 3px;
+  font-size: clamp(26px, 3.2vw, 42px);
+}
+
+.controls-close-button,
+.reset-controls-button {
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 5px;
+  background: rgba(255,255,255,.06);
+  padding: 8px 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.controls-close-button:hover,
+.reset-controls-button:hover {
+  border-color: var(--yellow);
+  background: rgba(255,207,68,.1);
+}
+
+.binding-prompt {
+  margin: 6px 0 15px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.binding-prompt.is-listening {
+  color: var(--yellow);
+  font-weight: 700;
+}
+
+.bindings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) minmax(210px, .75fr);
+  gap: 12px;
+}
+
+.binding-section {
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 8px;
+  background: rgba(255,255,255,.035);
+  padding: 13px;
+}
+
+.binding-section h3 {
+  margin-bottom: 9px;
+  color: var(--p1);
+  font-size: 14px;
+}
+
+.binding-section-p2 h3 {
+  color: var(--p2);
+}
+
+.binding-section-global h3 {
+  color: var(--yellow);
+}
+
+.binding-list {
+  display: grid;
+  gap: 5px;
+}
+
+.bind-key-button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: rgba(255,255,255,.035);
+  padding: 6px 8px;
+  color: #cfd5e4;
+  cursor: pointer;
+  font-size: 10px;
+  text-align: left;
+}
+
+.bind-key-button:hover,
+.bind-key-button:focus-visible,
+.bind-key-button.is-listening {
+  border-color: rgba(255,207,68,.7);
+  background: rgba(255,207,68,.1);
+  outline: none;
+}
+
+.bind-key-button.is-listening {
+  box-shadow: 0 0 18px rgba(255,207,68,.12);
+}
+
+.bind-key-button kbd {
+  min-width: 68px;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.bind-key-button.is-listening kbd {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.reset-controls-button {
+  width: 100%;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.binding-note {
+  margin: 10px 2px 0;
+  color: #697287;
+  font-size: 9px;
+  line-height: 1.6;
+}
+
 .mode-dialog {
   width: min(940px, 100%);
   margin: auto;
@@ -539,6 +685,34 @@ canvas {
   font-size: 10px;
 }
 
+.arena-controls {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  min-height: 46px;
+  border-top: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(to top, rgba(4, 7, 15, .97), rgba(4, 7, 15, .74));
+  padding: 7px 12px;
+  backdrop-filter: blur(7px);
+  pointer-events: none;
+}
+
+.arena-controls .control-group {
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.arena-controls .tip {
+  position: absolute;
+  left: 50%;
+  max-width: 360px;
+  margin: 0;
+  line-height: 1.35;
+  transform: translateX(-50%);
+}
+
 .control-group {
   display: flex;
   align-items: center;
@@ -646,6 +820,13 @@ kbd {
     align-items: flex-start;
   }
 
+  .arena-controls {
+    min-height: 44px;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
   .control-group {
     flex-wrap: wrap;
     gap: 7px;
@@ -657,5 +838,27 @@ kbd {
 
   .keymap-button small {
     display: none;
+  }
+
+  .controls-panel {
+    padding: 14px;
+  }
+
+  .bindings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .binding-section-global {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .bindings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .binding-section-global {
+    grid-column: auto;
   }
 }

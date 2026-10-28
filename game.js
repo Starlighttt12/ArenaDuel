@@ -26,6 +26,11 @@ const UI = {
   restartButton: document.querySelector("#restartButton"),
   pausePanel: document.querySelector("#pausePanel"),
   soundButton: document.querySelector("#soundButton"),
+  controlsButton: document.querySelector("#controlsButton"),
+  controlsPanel: document.querySelector("#controlsPanel"),
+  closeControlsButton: document.querySelector("#closeControlsButton"),
+  resetControlsButton: document.querySelector("#resetControlsButton"),
+  bindingPrompt: document.querySelector("#bindingPrompt"),
   modeButton: document.querySelector("#modeButton"),
   modePanel: document.querySelector("#modePanel"),
   modeHome: document.querySelector("#modeHome"),
@@ -42,11 +47,16 @@ const UI = {
   p2Controls: document.querySelector("#p2Controls"),
   controlsTip: document.querySelector("#controlsTip"),
   p1MovementHint: document.querySelector("#p1MovementHint"),
-  campaignMovementButton: document.querySelector("#campaignMovementButton"),
-  campaignMovementKeys: document.querySelector("#campaignMovementKeys"),
+  p1MovementKeys: document.querySelector("#p1MovementKeys"),
   p1FireKey: document.querySelector("#p1FireKey"),
   p1ReloadKey: document.querySelector("#p1ReloadKey"),
   p1SwitchKey: document.querySelector("#p1SwitchKey"),
+  p2MovementKeys: document.querySelector("#p2MovementKeys"),
+  p2FireKey: document.querySelector("#p2FireKey"),
+  p2ReloadKey: document.querySelector("#p2ReloadKey"),
+  p2SwitchKey: document.querySelector("#p2SwitchKey"),
+  pauseKeyHint: document.querySelector("#pauseKeyHint"),
+  restartKeyHint: document.querySelector("#restartKeyHint"),
   level1Best: document.querySelector("#level1Best"),
   level2Best: document.querySelector("#level2Best"),
   level3Best: document.querySelector("#level3Best"),
@@ -54,9 +64,10 @@ const UI = {
   roundInfoValue: document.querySelector("#roundInfoValue"),
   roundInfoSuffix: document.querySelector("#roundInfoSuffix"),
   arenaFrame: document.querySelector("#arenaFrame"),
-  p2MovementButton: document.querySelector("#p2MovementButton"),
-  p2MovementKeys: document.querySelector("#p2MovementKeys"),
 };
+
+const bindingButtons = Array.from(document.querySelectorAll(".bind-key-button"));
+const bindingDisplays = Array.from(document.querySelectorAll("[data-key-display]"));
 
 const W = canvas.width;
 const H = canvas.height;
@@ -77,54 +88,85 @@ const MAX_PICKUPS = 5;
 const ROUND_DURATION = 120;
 const BOT_FIRE_INTERVAL = 2;
 const BOT_HEALTH = 100;
-const P2_MOVEMENT_KEYMAPS = {
-  letters: { up: "KeyO", down: "KeyL", left: "KeyK", right: "Semicolon" },
-  arrows: { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" },
-};
-const CAMPAIGN_CONTROL_SCHEMES = {
-  wasd: {
-    moveKeys: { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD" },
-    fireKey: "ShiftLeft",
-    reloadKey: "KeyE",
-    switchKey: "KeyQ",
-    movementLabel: "WASD",
-    fireLabel: "左 Shift",
-    reloadLabel: "E",
-    switchLabel: "Q",
+const DEFAULT_KEY_BINDINGS = {
+  p1: {
+    up: "KeyW",
+    down: "KeyS",
+    left: "KeyA",
+    right: "KeyD",
+    fire: "ShiftLeft",
+    reload: "KeyE",
+    switch: "KeyQ",
   },
-  arrows: {
-    moveKeys: { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" },
-    fireKey: "ShiftRight",
-    reloadKey: "Slash",
-    switchKey: "Enter",
-    movementLabel: "↑ ↓ ← →",
-    fireLabel: "右 Shift",
-    reloadLabel: "/",
-    switchLabel: "Enter",
+  p2: {
+    up: "KeyO",
+    down: "KeyL",
+    left: "KeyK",
+    right: "Semicolon",
+    fire: "ShiftRight",
+    reload: "Slash",
+    switch: "Enter",
+  },
+  global: {
+    pause: "Space",
+    restart: "KeyR",
   },
 };
+const BINDING_NAMES = {
+  "p1.up": "Player 1 Move Up",
+  "p1.down": "Player 1 Move Down",
+  "p1.left": "Player 1 Move Left",
+  "p1.right": "Player 1 Move Right",
+  "p1.fire": "Player 1 Fire",
+  "p1.reload": "Player 1 Reload",
+  "p1.switch": "Player 1 Switch Weapon",
+  "p2.up": "Player 2 Move Up",
+  "p2.down": "Player 2 Move Down",
+  "p2.left": "Player 2 Move Left",
+  "p2.right": "Player 2 Move Right",
+  "p2.fire": "Player 2 Fire",
+  "p2.reload": "Player 2 Reload",
+  "p2.switch": "Player 2 Switch Weapon",
+  "global.pause": "Pause / Resume",
+  "global.restart": "Restart / Next Round",
+};
+const BINDING_IDS = Object.keys(BINDING_NAMES);
 
-function getSavedP2MovementMode() {
-  try {
-    const savedMode = localStorage.getItem("arenaDuel.p2MovementMode");
-    return savedMode === "arrows" ? "arrows" : "letters";
-  } catch {
-    return "letters";
-  }
+function copyDefaultKeyBindings() {
+  return {
+    p1: { ...DEFAULT_KEY_BINDINGS.p1 },
+    p2: { ...DEFAULT_KEY_BINDINGS.p2 },
+    global: { ...DEFAULT_KEY_BINDINGS.global },
+  };
 }
 
-let p2MovementMode = getSavedP2MovementMode();
-
-function getSavedCampaignMovementMode() {
-  try {
-    const savedMode = localStorage.getItem("arenaDuel.campaignMovementMode");
-    return savedMode === "arrows" ? "arrows" : "wasd";
-  } catch {
-    return "wasd";
-  }
+function getBindingValue(bindings, bindingId) {
+  const [group, action] = bindingId.split(".");
+  return bindings?.[group]?.[action];
 }
 
-let campaignMovementMode = getSavedCampaignMovementMode();
+function setBindingValue(bindings, bindingId, value) {
+  const [group, action] = bindingId.split(".");
+  bindings[group][action] = value;
+}
+
+function loadKeyBindings() {
+  const bindings = copyDefaultKeyBindings();
+  try {
+    const savedBindings = JSON.parse(localStorage.getItem("arenaDuel.keyBindings"));
+    BINDING_IDS.forEach((bindingId) => {
+      const savedValue = getBindingValue(savedBindings, bindingId);
+      if (typeof savedValue === "string" && savedValue) {
+        setBindingValue(bindings, bindingId, savedValue);
+      }
+    });
+  } catch {
+    // Use defaults on first launch or when local storage is unavailable.
+  }
+  return bindings;
+}
+
+let keyBindings = loadKeyBindings();
 
 function getSavedCampaignBestTimes() {
   return [1, 2, 3].reduce((times, level) => {
@@ -143,7 +185,7 @@ const campaignBestTimes = getSavedCampaignBestTimes();
 const weapons = [
   {
     id: "pistol",
-    name: "脉冲手枪",
+    name: "Pulse Pistol",
     magSize: 12,
     reload: 1.15,
     damage: 14,
@@ -155,7 +197,7 @@ const weapons = [
   },
   {
     id: "smg",
-    name: "疾风冲锋枪",
+    name: "Gale SMG",
     magSize: 24,
     reload: 1.75,
     damage: 7,
@@ -167,7 +209,7 @@ const weapons = [
   },
   {
     id: "shotgun",
-    name: "破阵霰弹枪",
+    name: "Breach Shotgun",
     magSize: 3,
     reload: 2.25,
     damage: 9,
@@ -207,6 +249,8 @@ let campaignShotsFired = 0;
 let campaignElapsed = 0;
 let campaignWon = false;
 let stateBeforeModePanel = "countdown";
+let stateBeforeControlsPanel = "countdown";
+let activeBindingId = null;
 
 function createWeaponStates() {
   return weapons.map((weapon) => ({
@@ -235,12 +279,15 @@ function createPlayer(id) {
     speedBuffTimer: 0,
     invincibilityTimer: 0,
     score: 0,
-    moveKeys: isP1
-      ? { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD" }
-      : { ...P2_MOVEMENT_KEYMAPS[p2MovementMode] },
-    fireKey: isP1 ? "ShiftLeft" : "ShiftRight",
-    reloadKey: isP1 ? "KeyE" : "Slash",
-    switchKey: isP1 ? "KeyQ" : "Enter",
+    moveKeys: {
+      up: keyBindings[isP1 ? "p1" : "p2"].up,
+      down: keyBindings[isP1 ? "p1" : "p2"].down,
+      left: keyBindings[isP1 ? "p1" : "p2"].left,
+      right: keyBindings[isP1 ? "p1" : "p2"].right,
+    },
+    fireKey: keyBindings[isP1 ? "p1" : "p2"].fire,
+    reloadKey: keyBindings[isP1 ? "p1" : "p2"].reload,
+    switchKey: keyBindings[isP1 ? "p1" : "p2"].switch,
   };
 }
 
@@ -318,58 +365,155 @@ function createCampaignBots(level) {
   return levelBots;
 }
 
-function updateP2MovementControls() {
-  players[1].moveKeys = { ...P2_MOVEMENT_KEYMAPS[p2MovementMode] };
-  UI.p2MovementKeys.textContent = p2MovementMode === "arrows" ? "↑ ↓ ← →" : "OKL;";
-  UI.p2MovementButton.classList.toggle("is-arrows", p2MovementMode === "arrows");
-  UI.p2MovementButton.setAttribute(
-    "aria-label",
-    `红方移动键位：${p2MovementMode === "arrows" ? "上下左右方向键" : "O K L 分号"}，点击切换`,
-  );
+function formatKeyCode(code) {
+  const labels = {
+    ArrowUp: "↑",
+    ArrowDown: "↓",
+    ArrowLeft: "←",
+    ArrowRight: "→",
+    Space: "Space",
+    ShiftLeft: "Left Shift",
+    ShiftRight: "Right Shift",
+    ControlLeft: "Left Ctrl",
+    ControlRight: "Right Ctrl",
+    AltLeft: "Left Alt",
+    AltRight: "Right Alt",
+    MetaLeft: "Left Command",
+    MetaRight: "Right Command",
+    Enter: "Enter",
+    NumpadEnter: "Numpad Enter",
+    Escape: "Esc",
+    Backspace: "Backspace",
+    Tab: "Tab",
+    CapsLock: "Caps Lock",
+    Semicolon: ";",
+    Quote: "'",
+    Comma: ",",
+    Period: ".",
+    Slash: "/",
+    Backslash: "\\",
+    BracketLeft: "[",
+    BracketRight: "]",
+    Minus: "-",
+    Equal: "=",
+    Backquote: "`",
+  };
+  if (labels[code]) return labels[code];
+  if (code.startsWith("Key")) return code.slice(3);
+  if (code.startsWith("Digit")) return code.slice(5);
+  if (code.startsWith("Numpad")) return `Numpad ${code.slice(6)}`;
+  return code;
 }
 
-function toggleP2MovementMode() {
-  p2MovementMode = p2MovementMode === "letters" ? "arrows" : "letters";
+function applyKeyBindings() {
+  ["p1", "p2"].forEach((group, index) => {
+    players[index].moveKeys = {
+      up: keyBindings[group].up,
+      down: keyBindings[group].down,
+      left: keyBindings[group].left,
+      right: keyBindings[group].right,
+    };
+    players[index].fireKey = keyBindings[group].fire;
+    players[index].reloadKey = keyBindings[group].reload;
+    players[index].switchKey = keyBindings[group].switch;
+  });
   keys.clear();
-  updateP2MovementControls();
-  try {
-    localStorage.setItem("arenaDuel.p2MovementMode", p2MovementMode);
-  } catch {
-    // 隐私模式等环境可能禁止本地存储，当前选择仍然立即生效。
+}
+
+function movementKeySummary(group) {
+  const bindings = keyBindings[group];
+  return `↑${formatKeyCode(bindings.up)} ↓${formatKeyCode(bindings.down)} ←${formatKeyCode(bindings.left)} →${formatKeyCode(bindings.right)}`;
+}
+
+function updateKeyBindingUI() {
+  bindingDisplays.forEach((display) => {
+    display.textContent = formatKeyCode(getBindingValue(keyBindings, display.dataset.keyDisplay));
+  });
+  UI.p1MovementKeys.textContent = movementKeySummary("p1");
+  UI.p1FireKey.textContent = formatKeyCode(keyBindings.p1.fire);
+  UI.p1ReloadKey.textContent = formatKeyCode(keyBindings.p1.reload);
+  UI.p1SwitchKey.textContent = formatKeyCode(keyBindings.p1.switch);
+  UI.p2MovementKeys.textContent = movementKeySummary("p2");
+  UI.p2FireKey.textContent = formatKeyCode(keyBindings.p2.fire);
+  UI.p2ReloadKey.textContent = formatKeyCode(keyBindings.p2.reload);
+  UI.p2SwitchKey.textContent = formatKeyCode(keyBindings.p2.switch);
+  UI.pauseKeyHint.textContent = formatKeyCode(keyBindings.global.pause);
+  UI.restartKeyHint.textContent = formatKeyCode(keyBindings.global.restart);
+  if (gameMode === "campaign") {
+    UI.controlsTip.textContent = `Defeat ${bots.length} AI enemies · ${formatKeyCode(keyBindings.global.restart)} to restart anytime · Timer starts at FIGHT`;
   }
+}
+
+function saveKeyBindings() {
+  try {
+    localStorage.setItem("arenaDuel.keyBindings", JSON.stringify(keyBindings));
+  } catch {
+    // Settings remain active for this session if local storage is unavailable.
+  }
+}
+
+function stopListeningForBinding(message = "Click an action, then press a key") {
+  activeBindingId = null;
+  bindingButtons.forEach((button) => button.classList.remove("is-listening"));
+  UI.bindingPrompt.classList.remove("is-listening");
+  UI.bindingPrompt.textContent = message;
+}
+
+function beginKeyBinding(bindingId) {
+  activeBindingId = bindingId;
+  keys.clear();
+  bindingButtons.forEach((button) => {
+    button.classList.toggle("is-listening", button.dataset.binding === bindingId);
+  });
+  UI.bindingPrompt.classList.add("is-listening");
+  UI.bindingPrompt.textContent = `Setting “${BINDING_NAMES[bindingId]}” — press a key`;
+}
+
+function assignKeyBinding(bindingId, code) {
+  const previousCode = getBindingValue(keyBindings, bindingId);
+  const conflictingId = BINDING_IDS.find(
+    (candidateId) => candidateId !== bindingId && getBindingValue(keyBindings, candidateId) === code,
+  );
+  setBindingValue(keyBindings, bindingId, code);
+  if (conflictingId) setBindingValue(keyBindings, conflictingId, previousCode);
+  applyKeyBindings();
+  updateKeyBindingUI();
+  saveKeyBindings();
+  const swapMessage = conflictingId ? `; swapped with “${BINDING_NAMES[conflictingId]}”` : "";
+  stopListeningForBinding(`“${BINDING_NAMES[bindingId]}” is now ${formatKeyCode(code)}${swapMessage}`);
   playTone(440, 0.06, "sine", 0.025);
 }
 
-function updateCampaignMovementControls() {
-  const scheme = gameMode === "campaign"
-    ? CAMPAIGN_CONTROL_SCHEMES[campaignMovementMode]
-    : CAMPAIGN_CONTROL_SCHEMES.wasd;
-  players[0].moveKeys = { ...scheme.moveKeys };
-  players[0].fireKey = scheme.fireKey;
-  players[0].reloadKey = scheme.reloadKey;
-  players[0].switchKey = scheme.switchKey;
-  UI.campaignMovementKeys.textContent = scheme.movementLabel;
-  UI.p1FireKey.textContent = scheme.fireLabel;
-  UI.p1ReloadKey.textContent = scheme.reloadLabel;
-  UI.p1SwitchKey.textContent = scheme.switchLabel;
-  UI.campaignMovementButton.classList.toggle("is-arrows", campaignMovementMode === "arrows");
-  UI.campaignMovementButton.setAttribute(
-    "aria-label",
-    `闯关键位：${scheme.movementLabel} 移动，${scheme.fireLabel} 射击，${scheme.reloadLabel} 换弹，${scheme.switchLabel} 换枪；点击切换整套键位`,
-  );
+function resetKeyBindings() {
+  keyBindings = copyDefaultKeyBindings();
+  applyKeyBindings();
+  updateKeyBindingUI();
+  saveKeyBindings();
+  stopListeningForBinding("Default controls restored");
+  playTone(360, 0.06, "sine", 0.025);
 }
 
-function toggleCampaignMovementMode() {
-  if (gameMode !== "campaign") return;
-  campaignMovementMode = campaignMovementMode === "wasd" ? "arrows" : "wasd";
+function openControlsPanel() {
+  if (state !== "controls") stateBeforeControlsPanel = state;
+  state = "controls";
   keys.clear();
-  updateCampaignMovementControls();
-  try {
-    localStorage.setItem("arenaDuel.campaignMovementMode", campaignMovementMode);
-  } catch {
-    // 本地存储不可用时，键位选择在本次游戏内仍然生效。
+  stopListeningForBinding();
+  UI.countdown.classList.add("hidden");
+  UI.pausePanel.classList.add("hidden");
+  UI.controlsPanel.classList.remove("hidden");
+  updateKeyBindingUI();
+}
+
+function closeControlsPanel() {
+  if (state !== "controls") return;
+  stopListeningForBinding();
+  UI.controlsPanel.classList.add("hidden");
+  state = stateBeforeControlsPanel;
+  if (state === "countdown") {
+    countdownStarted = performance.now();
+    UI.countdown.classList.remove("hidden");
   }
-  playTone(440, 0.06, "sine", 0.025);
+  UI.pausePanel.classList.toggle("hidden", !paused);
   canvas.focus({ preventScroll: true });
 }
 
@@ -380,24 +524,22 @@ function formatCampaignTime(seconds) {
 function updateModePresentation() {
   const isCampaign = gameMode === "campaign";
   const currentBestTime = campaignBestTimes[campaignLevel];
-  UI.modeButton.textContent = isCampaign ? `模式：闯关 第 ${campaignLevel} 关` : "模式：双人对战";
+  UI.modeButton.textContent = isCampaign ? `MODE: CAMPAIGN · LEVEL ${campaignLevel}` : "MODE: DUEL";
   UI.p2Controls.classList.toggle("hidden", isCampaign);
-  UI.p1MovementHint.classList.toggle("hidden", isCampaign);
-  UI.campaignMovementButton.classList.toggle("hidden", !isCampaign);
   UI.controlsTip.textContent = isCampaign
-    ? `击败 ${bots.length} 名人机 · R 随时重新开始 · 计时从 FIGHT 开始`
-    : "移动方向就是射击方向 · 打空弹夹会自动换弹";
-  UI.roundInfoLabel.textContent = isCampaign ? "最好成绩" : "先赢得";
+    ? `Defeat ${bots.length} AI enemies · ${formatKeyCode(keyBindings.global.restart)} to restart anytime · Timer starts at FIGHT`
+    : "Movement direction is aim direction · Empty magazines reload automatically";
+  UI.roundInfoLabel.textContent = isCampaign ? "BEST" : "FIRST TO";
   UI.roundInfoValue.textContent = isCampaign && currentBestTime !== null
     ? formatCampaignTime(currentBestTime)
     : isCampaign ? "--" : "3";
-  UI.roundInfoSuffix.textContent = isCampaign ? "秒" : "局获胜";
+  UI.roundInfoSuffix.textContent = isCampaign ? "SEC" : "WINS";
   [UI.level1Best, UI.level2Best, UI.level3Best].forEach((element, index) => {
     const bestTime = campaignBestTimes[index + 1];
-    element.textContent = `最好成绩：${bestTime === null ? "--" : `${formatCampaignTime(bestTime)} 秒`}`;
+    element.textContent = `BEST: ${bestTime === null ? "--" : `${formatCampaignTime(bestTime)} SEC`}`;
   });
-  canvas.setAttribute("aria-label", isCampaign ? `闯关模式第 ${campaignLevel} 关竞技场` : "双人竞技场");
-  updateCampaignMovementControls();
+  canvas.setAttribute("aria-label", isCampaign ? `Campaign Level ${campaignLevel} arena` : "Arena Duel");
+  updateKeyBindingUI();
 }
 
 function showModeHome() {
@@ -911,17 +1053,17 @@ function endRound(winnerId, reason = "knockout") {
   const winner = isDraw ? null : players[winnerId - 1];
   if (winner) winner.score += 1;
   const matchOver = winner ? winner.score >= WIN_SCORE : false;
-  UI.resultEyebrow.textContent = matchOver ? "比赛结束" : reason === "timeout" ? "时间到" : `第 ${round} 局结束`;
-  UI.resultTitle.textContent = isDraw ? "本局平局" : `P${winnerId} 获胜`;
+  UI.resultEyebrow.textContent = matchOver ? "MATCH OVER" : reason === "timeout" ? "TIME UP" : `ROUND ${round} OVER`;
+  UI.resultTitle.textContent = isDraw ? "DRAW" : `P${winnerId} WINS`;
   UI.resultTitle.style.color = isDraw ? "#f5f7ff" : winner.color;
   UI.resultText.textContent = matchOver
-    ? `P${winnerId} 率先赢得 3 局，成为竞技场冠军`
+    ? `P${winnerId} wins 3 rounds first and becomes the Arena Champion`
     : isDraw
-      ? "双方剩余血量相同，本局不计分"
+      ? "Both players have equal health. No point awarded"
       : reason === "timeout"
-        ? `P${winnerId} 剩余血量更多，赢得本局`
-        : "按 R 或点击按钮进入下一局";
-  UI.restartButton.firstChild.textContent = matchOver ? "重新比赛 " : "下一局 ";
+        ? `P${winnerId} wins the round with more health remaining`
+        : `Press ${formatKeyCode(keyBindings.global.restart)} or click the button for the next round`;
+  UI.restartButton.firstChild.textContent = matchOver ? "REMATCH " : "NEXT ROUND ";
   UI.resultPanel.classList.remove("hidden");
   if (winner) {
     burst(winner.x, winner.y, winner.color, 50, 320);
@@ -943,16 +1085,16 @@ function endCampaign(won) {
     try {
       localStorage.setItem(`arenaDuel.campaignBestLevel${campaignLevel}`, String(completionTime));
     } catch {
-      // 无法持久保存时，本次页面中仍保留最好成绩。
+      // Keep the best time for this session if persistent storage is unavailable.
     }
   }
-  UI.resultEyebrow.textContent = won ? "关卡完成" : "挑战结束";
-  UI.resultTitle.textContent = won ? `第 ${campaignLevel} 关通过` : "闯关失败";
+  UI.resultEyebrow.textContent = won ? "LEVEL COMPLETE" : "CHALLENGE OVER";
+  UI.resultTitle.textContent = won ? `LEVEL ${campaignLevel} CLEARED` : "CAMPAIGN FAILED";
   UI.resultTitle.style.color = won ? "#73ffbc" : "#ff4d8d";
   UI.resultText.textContent = won
-    ? `用时 ${formatCampaignTime(completionTime)} 秒 · ${isNewBest ? "新的最好成绩" : `最好成绩 ${formatCampaignTime(campaignBestTimes[campaignLevel])} 秒`} · ${campaignLevel < 3 ? `下一关：第 ${campaignLevel + 1} 关` : "全部关卡完成"}`
-    : `按 R 或点击按钮重新挑战第 ${campaignLevel} 关`;
-  UI.restartButton.firstChild.textContent = won && campaignLevel < 3 ? "下一关 " : won ? "再玩一次 " : "重新挑战 ";
+    ? `TIME ${formatCampaignTime(completionTime)} SEC · ${isNewBest ? "NEW BEST TIME" : `BEST ${formatCampaignTime(campaignBestTimes[campaignLevel])} SEC`} · ${campaignLevel < 3 ? `NEXT: LEVEL ${campaignLevel + 1}` : "ALL LEVELS COMPLETE"}`
+    : `Press ${formatKeyCode(keyBindings.global.restart)} or click the button to retry Level ${campaignLevel}`;
+  UI.restartButton.firstChild.textContent = won && campaignLevel < 3 ? "NEXT LEVEL " : won ? "PLAY AGAIN " : "RETRY ";
   UI.resultPanel.classList.remove("hidden");
   if (won) {
     burst(players[0].x, players[0].y, players[0].color, 50, 320);
@@ -1008,16 +1150,16 @@ function updateUI() {
     UI[`${prefix}Weapon`].textContent = currentWeapon(player).name;
     UI[`${prefix}Score`].textContent = player.score;
     UI[`${prefix}Status`].textContent = player.invincibilityTimer > 0
-      ? `无敌 ${player.invincibilityTimer.toFixed(1)}s`
+      ? `INVINCIBLE ${player.invincibilityTimer.toFixed(1)}s`
       : weaponState.reloading
-      ? `换弹中 ${(Math.max(0, weaponState.reloadTimer)).toFixed(1)}s`
+      ? `RELOADING ${(Math.max(0, weaponState.reloadTimer)).toFixed(1)}s`
       : player.damageBuffTimer > 0
-        ? `攻击强化 ${player.damageBuffTimer.toFixed(1)}s · 150%`
+        ? `DAMAGE BOOST ${player.damageBuffTimer.toFixed(1)}s · 150%`
       : player.speedBuffTimer > 0
-        ? `速度强化 ${player.speedBuffTimer.toFixed(1)}s · 120%`
+        ? `SPEED BOOST ${player.speedBuffTimer.toFixed(1)}s · 120%`
       : player.health <= 30
-        ? "生命垂危"
-        : "战斗就绪";
+        ? "CRITICAL HEALTH"
+        : "READY";
     UI[`${prefix}Health`].style.filter = player.health <= 30 ? "saturate(.5) brightness(1.4)" : "";
   });
   if (gameMode === "campaign") {
@@ -1026,24 +1168,24 @@ function updateUI() {
     const [greenBot, yellowBot] = bots;
     const botAmmoText = bots.map((bot) => {
       const shortName = bot.id === "bot-green"
-        ? "绿"
+        ? "G"
         : bot.id === "bot-yellow"
-          ? campaignLevel === 1 ? "黄" : "黄1"
-          : bot.id === "bot-yellow-2" ? "黄2" : "霰";
+          ? campaignLevel === 1 ? "Y" : "Y1"
+          : bot.id === "bot-yellow-2" ? "Y2" : "SG";
       return bot.reloading
-        ? `${shortName} 换弹 ${Math.max(0, bot.reloadTimer).toFixed(1)}s`
+        ? `${shortName} RELOAD ${Math.max(0, bot.reloadTimer).toFixed(1)}s`
         : `${shortName} ${bot.ammo}/${weapons[bot.weaponIndex].magSize}`;
     }).join(" · ");
     const shotgunBot = bots.find((bot) => bot.id === "bot-shotgun");
     UI.p1Tag.textContent = "P1";
     UI.p1Score.textContent = campaignLevel;
     UI.p2Tag.textContent = "AI";
-    UI.p2Weapon.textContent = campaignLevel === 3 ? "AI 编队 + 霰弹枪" : `AI 编队 × ${bots.length}`;
+    UI.p2Weapon.textContent = campaignLevel === 3 ? "AI SQUAD + SHOTGUN" : `AI SQUAD × ${bots.length}`;
     UI.p2Score.textContent = aliveBots;
     UI.p2Health.style.width = `${(totalBotHealth / (BOT_HEALTH * bots.length)) * 100}%`;
     UI.p2HealthText.textContent = `${aliveBots} / ${bots.length}`;
     UI.p2Ammo.textContent = botAmmoText;
-    UI.p2Status.textContent = aliveBots > 0 ? `${aliveBots} 名人机 · 各自 2 秒/发` : "敌人已清除";
+    UI.p2Status.textContent = aliveBots > 0 ? `${aliveBots} AI · EACH FIRES EVERY 2 SEC` : "AREA CLEARED";
     UI.roundLabel.textContent = `LEVEL ${campaignLevel}`;
     UI.matchTimer.textContent = `${formatCampaignTime(campaignElapsed)}s`;
     UI.matchTimer.style.color = "#ffcf44";
@@ -1061,7 +1203,7 @@ function updateUI() {
     UI.arenaFrame.dataset.yellowReloading = String(yellowBot.reloading);
     UI.arenaFrame.dataset.shotgunShotsFired = String(shotgunBot?.shotsFired ?? 0);
     UI.arenaFrame.dataset.shotgunAmmo = String(shotgunBot?.ammo ?? 0);
-    UI.arenaFrame.dataset.controlScheme = campaignMovementMode;
+    UI.arenaFrame.dataset.controlScheme = "custom";
   } else {
     UI.p1Tag.textContent = "P1";
     UI.p2Tag.textContent = "P2";
@@ -1419,7 +1561,7 @@ function drawPickup(pickup, time) {
   ctx.font = "700 10px Noto Sans SC, sans-serif";
   ctx.fillStyle = color;
   ctx.fillText(
-    isMedkit ? "+30 生命" : isDamage ? "150% 攻击" : isInvincible ? "5秒无敌" : "120% 速度",
+    isMedkit ? "+30 HEALTH" : isDamage ? "150% DAMAGE" : isInvincible ? "5s SHIELD" : "120% SPEED",
     pickup.x,
     pickup.y + bob + 34,
   );
@@ -1533,19 +1675,25 @@ function loop(now) {
 }
 
 window.addEventListener("keydown", (event) => {
-  const blockedKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Space", "ShiftLeft", "ShiftRight", "Slash", "KeyK", "KeyL", "KeyO", "Semicolon"];
-  if (blockedKeys.includes(event.code)) event.preventDefault();
+  if (state === "controls") {
+    event.preventDefault();
+    if (activeBindingId && !event.repeat && event.code) assignKeyBinding(activeBindingId, event.code);
+    return;
+  }
+
+  const assignedKeys = BINDING_IDS.map((bindingId) => getBindingValue(keyBindings, bindingId));
+  if (assignedKeys.includes(event.code)) event.preventDefault();
   keys.add(event.code);
 
   if (!event.repeat && event.code === players[0].switchKey) switchWeapon(players[0]);
   if (gameMode === "duel" && !event.repeat && event.code === players[1].switchKey) switchWeapon(players[1]);
   if (!event.repeat && event.code === players[0].reloadKey) beginReload(players[0]);
   if (gameMode === "duel" && !event.repeat && event.code === players[1].reloadKey) beginReload(players[1]);
-  if (!event.repeat && event.code === "KeyR") {
+  if (!event.repeat && event.code === keyBindings.global.restart) {
     if (gameMode === "campaign") startCampaignLevel(campaignLevel);
     else continueGame();
   }
-  if (!event.repeat && event.code === "Space" && state !== "roundOver" && state !== "modeSelect") {
+  if (!event.repeat && event.code === keyBindings.global.pause && state !== "roundOver" && state !== "modeSelect") {
     paused = !paused;
     UI.pausePanel.classList.toggle("hidden", !paused);
     if (!paused && state === "countdown") {
@@ -1558,8 +1706,12 @@ window.addEventListener("keyup", (event) => keys.delete(event.code));
 window.addEventListener("blur", () => keys.clear());
 
 UI.restartButton.addEventListener("click", continueGame);
-UI.p2MovementButton.addEventListener("click", toggleP2MovementMode);
-UI.campaignMovementButton.addEventListener("click", toggleCampaignMovementMode);
+UI.controlsButton.addEventListener("click", openControlsPanel);
+UI.closeControlsButton.addEventListener("click", closeControlsPanel);
+UI.resetControlsButton.addEventListener("click", resetKeyBindings);
+bindingButtons.forEach((button) => {
+  button.addEventListener("click", () => beginKeyBinding(button.dataset.binding));
+});
 UI.modeButton.addEventListener("click", openModePanel);
 UI.closeModeButton.addEventListener("click", closeModePanel);
 UI.duelModeButton.addEventListener("click", startMatch);
@@ -1570,10 +1722,11 @@ UI.level2Button.addEventListener("click", () => startCampaignLevel(2));
 UI.level3Button.addEventListener("click", () => startCampaignLevel(3));
 UI.soundButton.addEventListener("click", () => {
   soundEnabled = !soundEnabled;
-  UI.soundButton.textContent = `声音：${soundEnabled ? "开" : "关"}`;
+  UI.soundButton.textContent = `SOUND: ${soundEnabled ? "ON" : "OFF"}`;
   if (soundEnabled) playTone(330, 0.08, "sine", 0.025);
 });
 
-updateP2MovementControls();
+applyKeyBindings();
+updateKeyBindingUI();
 startMatch();
 requestAnimationFrame(loop);

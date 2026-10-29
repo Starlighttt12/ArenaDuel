@@ -2,7 +2,7 @@
 
 A dependency-free local two-player PvP shooter that runs directly in the browser.
 
-It also includes a three-level single-player campaign.
+It also includes a three-level campaign with Solo and local 2P Co-op variants.
 
 The game world is `1440 × 720`. The original `1280 × 720` layout remains centered, with 80 units of real playable space added to both the left and right sides. The original height and all character, bullet, and obstacle sizes remain unchanged. The page scales to the browser width without horizontal scrolling.
 
@@ -24,13 +24,13 @@ Open `index.html` directly, or run any static file server in this directory.
 
 ## Campaign
 
-Select the mode button in the upper-right corner, choose **DUEL** or **CAMPAIGN**, then select Campaign Level 1, 2, or 3. Every level uses the same arena and obstacles as Duel. Player 1's custom controls apply to every campaign level.
+Select the mode button in the upper-right corner, choose **DUEL** or **CAMPAIGN**, select **SOLO** or **2P CO-OP**, then choose Campaign Level 1, 2, or 3. Every level uses the same arena and obstacles as Duel. Solo uses Player 1's custom controls; 2P Co-op enables both Player 1 and Player 2 controls.
 
 - Level 1: Green AI + Yellow AI.
 - Level 2: Adds one Yellow AI for a total of three enemies.
 - Level 3: Adds one Shotgun AI for a total of four enemies. The Shotgun AI fires a six-pellet blast every two seconds and uses a three-round magazine with a 2.25-second reload.
 
-The timer starts when `FIGHT` appears and is measured to 0.1 seconds. The results screen shows the completion time and saves a separate best time for every level.
+In 2P Co-op, both players spawn on the left side and fight together. Their two half-width health bars share the left HUD area, while the right HUD shows the AI squad's combined health. AI enemies target the nearest living player, the mission continues while either player is alive, and every enemy has double health. The timer starts when `FIGHT` appears and is measured to 0.1 seconds. Solo and 2P Co-op each save their own best time for every level, for six independent records in total.
 
 In Campaign, the configured restart key immediately restarts the current level. In Duel, it advances only after the round has ended.
 

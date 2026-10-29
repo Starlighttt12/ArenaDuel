@@ -4,6 +4,7 @@ const canvas = document.querySelector("#gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const UI = {
+  hud: document.querySelector(".hud"),
   p1Health: document.querySelector("#p1Health"),
   p2Health: document.querySelector("#p2Health"),
   p1HealthText: document.querySelector("#p1HealthText"),
@@ -16,6 +17,12 @@ const UI = {
   p2Status: document.querySelector("#p2Status"),
   p1Score: document.querySelector("#p1Score"),
   p2Score: document.querySelector("#p2Score"),
+  coopP2Health: document.querySelector("#coopP2Health"),
+  coopP2HealthText: document.querySelector("#coopP2HealthText"),
+  coopP2Ammo: document.querySelector("#coopP2Ammo"),
+  coopP2Weapon: document.querySelector("#coopP2Weapon"),
+  coopP2Status: document.querySelector("#coopP2Status"),
+  coopP2Score: document.querySelector("#coopP2Score"),
   roundLabel: document.querySelector("#roundLabel"),
   matchTimer: document.querySelector("#matchTimer"),
   countdown: document.querySelector("#countdown"),
@@ -37,9 +44,13 @@ const UI = {
   levelSelect: document.querySelector("#levelSelect"),
   duelModeButton: document.querySelector("#duelModeButton"),
   campaignModeButton: document.querySelector("#campaignModeButton"),
+  campaignSoloButton: document.querySelector("#campaignSoloButton"),
+  campaignCoopButton: document.querySelector("#campaignCoopButton"),
+  campaignPlayerSummary: document.querySelector("#campaignPlayerSummary"),
   level1Button: document.querySelector("#level1Button"),
   level2Button: document.querySelector("#level2Button"),
   level3Button: document.querySelector("#level3Button"),
+  level4Button: document.querySelector("#level4Button"),
   backModeButton: document.querySelector("#backModeButton"),
   closeModeButton: document.querySelector("#closeModeButton"),
   p1Tag: document.querySelector("#p1Tag"),
@@ -60,6 +71,7 @@ const UI = {
   level1Best: document.querySelector("#level1Best"),
   level2Best: document.querySelector("#level2Best"),
   level3Best: document.querySelector("#level3Best"),
+  level4Best: document.querySelector("#level4Best"),
   roundInfoLabel: document.querySelector("#roundInfoLabel"),
   roundInfoValue: document.querySelector("#roundInfoValue"),
   roundInfoSuffix: document.querySelector("#roundInfoSuffix"),
@@ -84,6 +96,11 @@ const DAMAGE_BUFF_MULTIPLIER = 1.5;
 const SPEED_BUFF_DURATION = 10;
 const SPEED_BUFF_MULTIPLIER = 1.2;
 const INVINCIBILITY_DURATION = 5;
+const HOMING_BUFF_DURATION = 5;
+const HOMING_CHANCE = 0.5;
+const HOMING_TRACK_DURATION = 1;
+const HOMING_TURN_RATE = Math.PI;
+const HOMING_COLOR = "#d66bff";
 const MAX_PICKUPS = 5;
 const ROUND_DURATION = 120;
 const BOT_FIRE_INTERVAL = 2;
@@ -173,10 +190,10 @@ function loadKeyBindings() {
 
 let keyBindings = loadKeyBindings();
 
-function getSavedCampaignBestTimes() {
-  return [1, 2, 3].reduce((times, level) => {
+function getSavedCampaignBestTimes(storagePrefix) {
+  return [1, 2, 3, 4].reduce((times, level) => {
     try {
-      const savedTime = Number.parseFloat(localStorage.getItem(`arenaDuel.campaignBestLevel${level}`));
+      const savedTime = Number.parseFloat(localStorage.getItem(`${storagePrefix}${level}`));
       times[level] = Number.isFinite(savedTime) && savedTime > 0 ? savedTime : null;
     } catch {
       times[level] = null;
@@ -185,7 +202,10 @@ function getSavedCampaignBestTimes() {
   }, {});
 }
 
-const campaignBestTimes = getSavedCampaignBestTimes();
+const campaignBestTimes = {
+  solo: getSavedCampaignBestTimes("arenaDuel.campaignBestLevel"),
+  coop: getSavedCampaignBestTimes("arenaDuel.campaignCoopBestLevel"),
+};
 
 const weapons = [
   {
@@ -249,10 +269,12 @@ let screenShake = 0;
 let round = 1;
 let gameMode = "duel";
 let campaignLevel = 1;
+let campaignPlayerCount = 1;
 let bots = [];
 let campaignShotsFired = 0;
 let campaignElapsed = 0;
 let campaignWon = false;
+let campaignBossSpawned = false;
 let stateBeforeModePanel = "countdown";
 let stateBeforeControlsPanel = "countdown";
 let activeBindingId = null;
@@ -284,6 +306,7 @@ function createPlayer(id) {
     damageBuffTimer: 0,
     speedBuffTimer: 0,
     invincibilityTimer: 0,
+    homingBuffTimer: 0,
     score: 0,
     moveKeys: {
       up: keyBindings[isP1 ? "p1" : "p2"].up,
@@ -299,14 +322,40 @@ function createPlayer(id) {
 
 const players = [createPlayer(1), createPlayer(2)];
 
-function createBot({ id, label, x = W - 190 - WORLD_X_OFFSET, y, color, darkColor, weaponIndex, fireDelay }) {
+function isCampaignCoop() {
+  return campaignPlayerCount === 2;
+}
+
+function getCampaignPlayers(aliveOnly = false) {
+  const campaignPlayers = players.slice(0, campaignPlayerCount);
+  return aliveOnly ? campaignPlayers.filter((player) => player.health > 0) : campaignPlayers;
+}
+
+function getCampaignRecordSet() {
+  return campaignBestTimes[isCampaignCoop() ? "coop" : "solo"];
+}
+
+function createBot({
+  id,
+  label,
+  x = W - 190 - WORLD_X_OFFSET,
+  y,
+  color,
+  darkColor,
+  weaponIndex,
+  fireDelay,
+  maxHealth = BOT_HEALTH * (campaignPlayerCount === 2 ? 2 : 1),
+  radius = PLAYER_RADIUS,
+  isBoss = false,
+}) {
   return {
     id,
     label,
     x,
     y,
     angle: Math.PI,
-    health: BOT_HEALTH,
+    health: maxHealth,
+    maxHealth,
     color,
     darkColor,
     weaponColor: weapons[weaponIndex].color,
@@ -318,10 +367,35 @@ function createBot({ id, label, x = W - 190 - WORLD_X_OFFSET, y, color, darkColo
     shotsFired: 0,
     hitFlash: 0,
     alive: true,
+    radius,
+    isBoss,
   };
 }
 
 function createCampaignBots(level) {
+  if (level === 4) {
+    return [
+      createBot({
+        id: "bot-shotgun-1",
+        label: "SHOTGUN AI 1",
+        y: 178,
+        color: "#ff8a4c",
+        darkColor: "#843d24",
+        weaponIndex: 2,
+        fireDelay: BOT_FIRE_INTERVAL,
+      }),
+      createBot({
+        id: "bot-shotgun-2",
+        label: "SHOTGUN AI 2",
+        y: H - 178,
+        color: "#ff8a4c",
+        darkColor: "#843d24",
+        weaponIndex: 2,
+        fireDelay: BOT_FIRE_INTERVAL + 1,
+      }),
+    ];
+  }
+
   const levelBots = [
     createBot({
       id: "bot-green",
@@ -369,6 +443,38 @@ function createCampaignBots(level) {
   }
 
   return levelBots;
+}
+
+function createCampaignBoss() {
+  const boss = createBot({
+    id: "boss",
+    label: "ARENA BOSS",
+    y: H / 2,
+    color: "#d66bff",
+    darkColor: "#6e278d",
+    weaponIndex: 1,
+    fireDelay: BOT_FIRE_INTERVAL,
+    maxHealth: 300 * (isCampaignCoop() ? 2 : 1),
+    radius: PLAYER_RADIUS * 2,
+    isBoss: true,
+  });
+  boss.shotgunFireTimer = 5;
+  boss.shotgunAmmo = weapons[2].magSize;
+  boss.shotgunReloading = false;
+  boss.shotgunReloadTimer = 0;
+  boss.shotgunShotsFired = 0;
+  return boss;
+}
+
+function spawnCampaignBoss() {
+  campaignBossSpawned = true;
+  const boss = createCampaignBoss();
+  bots = [boss];
+  burst(boss.x, boss.y, boss.color, 60, 340);
+  screenShake = Math.max(screenShake, 10);
+  playTone(105, 0.22, "sawtooth", 0.05);
+  updateModePresentation();
+  updateUI();
 }
 
 function formatKeyCode(code) {
@@ -434,6 +540,11 @@ function movementKeySummary(group) {
   return `↑${formatKeyCode(bindings.up)} ↓${formatKeyCode(bindings.down)} ←${formatKeyCode(bindings.left)} →${formatKeyCode(bindings.right)}`;
 }
 
+function campaignObjectiveText() {
+  if (campaignLevel !== 4) return `Defeat ${bots.length} AI`;
+  return campaignBossSpawned ? "Defeat the Boss" : "Defeat 2 Shotgun AI to summon the Boss";
+}
+
 function updateKeyBindingUI() {
   bindingDisplays.forEach((display) => {
     display.textContent = formatKeyCode(getBindingValue(keyBindings, display.dataset.keyDisplay));
@@ -449,7 +560,7 @@ function updateKeyBindingUI() {
   UI.pauseKeyHint.textContent = formatKeyCode(keyBindings.global.pause);
   UI.restartKeyHint.textContent = formatKeyCode(keyBindings.global.restart);
   if (gameMode === "campaign") {
-    UI.controlsTip.textContent = `Defeat ${bots.length} AI enemies · ${formatKeyCode(keyBindings.global.restart)} to restart anytime · Timer starts at FIGHT`;
+    UI.controlsTip.textContent = `${isCampaignCoop() ? "2P CO-OP · AI HEALTH ×2" : "SOLO"} · ${campaignObjectiveText()} · ${formatKeyCode(keyBindings.global.restart)} to restart`;
   }
 }
 
@@ -530,24 +641,52 @@ function formatCampaignTime(seconds) {
   return seconds.toFixed(1);
 }
 
+function selectCampaignPlayerCount(playerCount) {
+  campaignPlayerCount = playerCount === 2 ? 2 : 1;
+  const coop = isCampaignCoop();
+  UI.campaignSoloButton.classList.toggle("is-active", !coop);
+  UI.campaignCoopButton.classList.toggle("is-active", coop);
+  UI.campaignSoloButton.setAttribute("aria-pressed", String(!coop));
+  UI.campaignCoopButton.setAttribute("aria-pressed", String(coop));
+  UI.campaignPlayerSummary.textContent = coop
+    ? "CO-OP RECORDS · P1 + P2 CONTROLS · ALL AI HEALTH ×2"
+    : "SOLO RECORDS · P1 CONTROLS · NORMAL AI HEALTH";
+  updateModePresentation();
+}
+
 function updateModePresentation() {
   const isCampaign = gameMode === "campaign";
-  const currentBestTime = campaignBestTimes[campaignLevel];
-  UI.modeButton.textContent = isCampaign ? `MODE: CAMPAIGN · LEVEL ${campaignLevel}` : "MODE: DUEL";
-  UI.p2Controls.classList.toggle("hidden", isCampaign);
+  const coop = isCampaignCoop();
+  const recordSet = getCampaignRecordSet();
+  const currentBestTime = recordSet[campaignLevel];
+  UI.hud.classList.toggle("campaign-mode", isCampaign);
+  UI.hud.classList.toggle("campaign-coop", isCampaign && coop);
+  UI.modeButton.textContent = isCampaign
+    ? `MODE: ${coop ? "2P CO-OP" : "CAMPAIGN"} · LEVEL ${campaignLevel}`
+    : "MODE: DUEL";
+  UI.p2Controls.classList.toggle("hidden", isCampaign && !coop);
   UI.controlsTip.textContent = isCampaign
-    ? `Defeat ${bots.length} AI enemies · ${formatKeyCode(keyBindings.global.restart)} to restart anytime · Timer starts at FIGHT`
+    ? `${coop ? "2P CO-OP · AI HEALTH ×2" : "SOLO"} · ${campaignObjectiveText()} · ${formatKeyCode(keyBindings.global.restart)} to restart`
     : "Movement direction is aim direction · Empty magazines reload automatically";
   UI.roundInfoLabel.textContent = isCampaign ? "BEST" : "FIRST TO";
   UI.roundInfoValue.textContent = isCampaign && currentBestTime !== null
     ? formatCampaignTime(currentBestTime)
     : isCampaign ? "--" : "3";
   UI.roundInfoSuffix.textContent = isCampaign ? "SEC" : "WINS";
-  [UI.level1Best, UI.level2Best, UI.level3Best].forEach((element, index) => {
-    const bestTime = campaignBestTimes[index + 1];
+  [UI.level1Best, UI.level2Best, UI.level3Best, UI.level4Best].forEach((element, index) => {
+    const bestTime = recordSet[index + 1];
     element.textContent = `BEST: ${bestTime === null ? "--" : `${formatCampaignTime(bestTime)} SEC`}`;
   });
-  canvas.setAttribute("aria-label", isCampaign ? `Campaign Level ${campaignLevel} arena` : "Arena Duel");
+  UI.campaignSoloButton.classList.toggle("is-active", !coop);
+  UI.campaignCoopButton.classList.toggle("is-active", coop);
+  UI.campaignSoloButton.setAttribute("aria-pressed", String(!coop));
+  UI.campaignCoopButton.setAttribute("aria-pressed", String(coop));
+  UI.campaignPlayerSummary.textContent = coop
+    ? "CO-OP RECORDS · P1 + P2 CONTROLS · ALL AI HEALTH ×2"
+    : "SOLO RECORDS · P1 CONTROLS · NORMAL AI HEALTH";
+  canvas.setAttribute("aria-label", isCampaign
+    ? `${coop ? "Two-player co-op" : "Solo campaign"} Level ${campaignLevel} arena`
+    : "Arena Duel");
   updateKeyBindingUI();
 }
 
@@ -603,6 +742,7 @@ function resetPlayer(player) {
   player.damageBuffTimer = 0;
   player.speedBuffTimer = 0;
   player.invincibilityTimer = 0;
+  player.homingBuffTimer = 0;
 }
 
 function startRound() {
@@ -636,10 +776,11 @@ function startMatch() {
 }
 
 function startCampaignLevel(level = 1) {
-  if (![1, 2, 3].includes(level)) return;
+  if (![1, 2, 3, 4].includes(level)) return;
   gameMode = "campaign";
   campaignLevel = level;
   campaignWon = false;
+  campaignBossSpawned = false;
   bullets = [];
   particles = [];
   trails = [];
@@ -647,9 +788,20 @@ function startCampaignLevel(level = 1) {
   pickupTimer = PICKUP_INTERVAL;
   campaignShotsFired = 0;
   campaignElapsed = 0;
-  players[0].score = 0;
-  players[0].weaponIndex = 0;
-  resetPlayer(players[0]);
+  players.forEach((player) => {
+    player.score = 0;
+    player.weaponIndex = 0;
+    resetPlayer(player);
+  });
+  if (isCampaignCoop()) {
+    const coopSpawnX = 180 + WORLD_X_OFFSET;
+    players[0].x = coopSpawnX;
+    players[0].y = H / 2 - 70;
+    players[0].angle = 0;
+    players[1].x = coopSpawnX;
+    players[1].y = H / 2 + 70;
+    players[1].angle = 0;
+  }
   bots = createCampaignBots(level);
   paused = false;
   state = "countdown";
@@ -699,6 +851,7 @@ function fire(player) {
   for (let i = 0; i < weapon.pellets; i += 1) {
     const spread = (Math.random() - 0.5) * weapon.spread * 2;
     const angle = player.angle + spread;
+    const isHoming = player.homingBuffTimer > 0 && Math.random() < HOMING_CHANCE;
     bullets.push({
       x: muzzleX,
       y: muzzleY,
@@ -709,8 +862,10 @@ function fire(player) {
       radius: weapon.id === "shotgun" ? 3.5 : 4.5,
       damage: weapon.damage * (player.damageBuffTimer > 0 ? DAMAGE_BUFF_MULTIPLIER : 1),
       owner: player.id,
-      color: weapon.color,
+      color: isHoming ? HOMING_COLOR : weapon.color,
       life: weapon.id === "shotgun" ? 0.52 : 1.45,
+      homing: isHoming,
+      homingElapsed: 0,
     });
   }
 
@@ -725,11 +880,13 @@ function fire(player) {
 
 function fireBot(bot) {
   if (!bot.alive || bot.reloading || bot.ammo <= 0 || state !== "playing") return;
-  const target = players[0];
+  const target = getClosestCampaignPlayer(bot);
+  if (!target) return;
   const weapon = weapons[bot.weaponIndex];
   bot.angle = Math.atan2(target.y - bot.y, target.x - bot.x);
-  const muzzleX = bot.x + Math.cos(bot.angle) * 35;
-  const muzzleY = bot.y + Math.sin(bot.angle) * 35;
+  const muzzleDistance = (bot.radius ?? PLAYER_RADIUS) + 10;
+  const muzzleX = bot.x + Math.cos(bot.angle) * muzzleDistance;
+  const muzzleY = bot.y + Math.sin(bot.angle) * muzzleDistance;
   for (let pellet = 0; pellet < weapon.pellets; pellet += 1) {
     const spread = weapon.id === "shotgun" ? (Math.random() - 0.5) * weapon.spread * 2 : 0;
     const angle = bot.angle + spread;
@@ -758,10 +915,58 @@ function fireBot(bot) {
   }
 }
 
+function fireBossShotgun(bot) {
+  if (!bot.alive || bot.shotgunReloading || bot.shotgunAmmo <= 0 || state !== "playing") return;
+  const target = getClosestCampaignPlayer(bot);
+  if (!target) return;
+  const weapon = weapons[2];
+  bot.angle = Math.atan2(target.y - bot.y, target.x - bot.x);
+  const muzzleDistance = bot.radius + 10;
+  const muzzleX = bot.x + Math.cos(bot.angle) * muzzleDistance;
+  const muzzleY = bot.y + Math.sin(bot.angle) * muzzleDistance;
+  for (let pellet = 0; pellet < weapon.pellets; pellet += 1) {
+    const angle = bot.angle + (Math.random() - 0.5) * weapon.spread * 2;
+    bullets.push({
+      x: muzzleX,
+      y: muzzleY,
+      lastX: muzzleX,
+      lastY: muzzleY,
+      vx: Math.cos(angle) * weapon.speed,
+      vy: Math.sin(angle) * weapon.speed,
+      radius: 3.5,
+      damage: weapon.damage,
+      owner: bot.id,
+      color: weapon.color,
+      life: 0.52,
+    });
+  }
+  bot.shotgunAmmo -= 1;
+  bot.shotgunShotsFired += 1;
+  campaignShotsFired += 1;
+  burst(muzzleX, muzzleY, weapon.color, 14, 150);
+  screenShake = Math.max(screenShake, 7);
+  playTone(90, 0.045, "sawtooth", 0.04);
+  if (bot.shotgunAmmo <= 0) {
+    bot.shotgunReloading = true;
+    bot.shotgunReloadTimer = weapon.reload;
+  }
+}
+
+function getClosestCampaignPlayer(bot) {
+  return getCampaignPlayers(true).reduce((closest, player) => {
+    if (!closest) return player;
+    const playerDistance = Math.hypot(player.x - bot.x, player.y - bot.y);
+    const closestDistance = Math.hypot(closest.x - bot.x, closest.y - bot.y);
+    return playerDistance < closestDistance ? player : closest;
+  }, null);
+}
+
 function updateBots(dt) {
   bots.forEach((bot) => {
     if (!bot.alive) return;
-    bot.angle = Math.atan2(players[0].y - bot.y, players[0].x - bot.x);
+    const target = getClosestCampaignPlayer(bot);
+    if (!target) return;
+    bot.angle = Math.atan2(target.y - bot.y, target.x - bot.x);
     bot.hitFlash = Math.max(0, bot.hitFlash - dt);
     if (bot.reloading) {
       bot.reloadTimer -= dt;
@@ -776,6 +981,22 @@ function updateBots(dt) {
     if (bot.fireTimer <= 0) {
       fireBot(bot);
       bot.fireTimer += BOT_FIRE_INTERVAL;
+    }
+    if (bot.isBoss) {
+      if (bot.shotgunReloading) {
+        bot.shotgunReloadTimer -= dt;
+        if (bot.shotgunReloadTimer <= 0) {
+          bot.shotgunReloading = false;
+          bot.shotgunReloadTimer = 0;
+          bot.shotgunAmmo = weapons[2].magSize;
+          playTone(420, 0.06, "sine", 0.02);
+        }
+      }
+      bot.shotgunFireTimer -= dt;
+      if (bot.shotgunFireTimer <= 0) {
+        fireBossShotgun(bot);
+        bot.shotgunFireTimer += 5;
+      }
     }
   });
 }
@@ -817,11 +1038,15 @@ function updatePlayer(player, dt) {
   }
 
   const collisionTargets = gameMode === "campaign"
-    ? bots.filter((bot) => bot.alive)
+    ? [
+      ...bots.filter((bot) => bot.alive),
+      ...getCampaignPlayers(true).filter((other) => other !== player),
+    ]
     : [players[player.id === 1 ? 1 : 0]];
   collisionTargets.forEach((other) => {
     const distance = Math.hypot(player.x - other.x, player.y - other.y);
-    if (distance < PLAYER_RADIUS * 2) {
+    const collisionDistance = PLAYER_RADIUS + (other.radius ?? PLAYER_RADIUS);
+    if (distance < collisionDistance) {
       const nx = (player.x - other.x) / (distance || 1);
       const ny = (player.y - other.y) / (distance || 1);
       movePlayer(player, nx * 1.5, ny * 1.5);
@@ -833,6 +1058,7 @@ function updatePlayer(player, dt) {
   player.damageBuffTimer = Math.max(0, player.damageBuffTimer - dt);
   player.speedBuffTimer = Math.max(0, player.speedBuffTimer - dt);
   player.invincibilityTimer = Math.max(0, player.invincibilityTimer - dt);
+  player.homingBuffTimer = Math.max(0, player.homingBuffTimer - dt);
 
   player.weaponStates.forEach((weaponState, weaponIndex) => {
     if (weaponState.reloading) {
@@ -854,10 +1080,10 @@ function isSafePickupPosition(x, y) {
     (rect) => !circleRectCollision(x, y, PICKUP_RADIUS + 10, rect),
   );
   const activeActors = gameMode === "campaign"
-    ? [players[0], ...bots.filter((bot) => bot.alive)]
+    ? [...getCampaignPlayers(true), ...bots.filter((bot) => bot.alive)]
     : players;
   const clearOfPlayers = activeActors.every(
-    (actor) => Math.hypot(x - actor.x, y - actor.y) > PLAYER_RADIUS + PICKUP_RADIUS + 45,
+    (actor) => Math.hypot(x - actor.x, y - actor.y) > (actor.radius ?? PLAYER_RADIUS) + PICKUP_RADIUS + 45,
   );
   const clearOfPickups = pickups.every(
     (pickup) => Math.hypot(x - pickup.x, y - pickup.y) > PICKUP_RADIUS * 3,
@@ -877,13 +1103,15 @@ function spawnPickup() {
     pickups.push({
       x,
       y,
-      type: roll < 0.25
+      type: roll < 0.2
         ? "medkit"
-        : roll < 0.5
+        : roll < 0.4
           ? "damage"
-          : roll < 0.75
+          : roll < 0.6
             ? "invincible"
-            : "speed",
+            : roll < 0.8
+              ? "speed"
+              : "homing",
       age: 0,
     });
     burst(x, y, "#ffffff", 18, 150);
@@ -905,10 +1133,14 @@ function collectPickup(player, pickup) {
     player.invincibilityTimer = INVINCIBILITY_DURATION;
     burst(pickup.x, pickup.y, "#b57bff", 28, 230);
     playTone(920, 0.16, "sine", 0.035);
-  } else {
+  } else if (pickup.type === "speed") {
     player.speedBuffTimer = SPEED_BUFF_DURATION;
     burst(pickup.x, pickup.y, "#56a8ff", 28, 240);
     playTone(1080, 0.12, "sine", 0.03);
+  } else if (pickup.type === "homing") {
+    player.homingBuffTimer = HOMING_BUFF_DURATION;
+    burst(pickup.x, pickup.y, HOMING_COLOR, 28, 230);
+    playTone(840, 0.16, "sine", 0.035);
   }
 }
 
@@ -922,7 +1154,7 @@ function updatePickups(dt) {
   for (let i = pickups.length - 1; i >= 0; i -= 1) {
     const pickup = pickups[i];
     pickup.age += dt;
-    const collectiblePlayers = gameMode === "campaign" ? [players[0]] : players;
+    const collectiblePlayers = gameMode === "campaign" ? getCampaignPlayers(true) : players;
     const collector = collectiblePlayers.find(
       (player) => Math.hypot(pickup.x - player.x, pickup.y - player.y) < PICKUP_RADIUS + PLAYER_RADIUS,
     );
@@ -943,9 +1175,45 @@ function bulletHitsWall(bullet) {
   );
 }
 
+function getHomingTarget(bullet) {
+  if (typeof bullet.owner !== "number") return null;
+  if (gameMode === "campaign") {
+    return bots.reduce((closest, bot) => {
+      if (!bot.alive) return closest;
+      if (!closest) return bot;
+      const botDistance = Math.hypot(bot.x - bullet.x, bot.y - bullet.y);
+      const closestDistance = Math.hypot(closest.x - bullet.x, closest.y - bullet.y);
+      return botDistance < closestDistance ? bot : closest;
+    }, null);
+  }
+  const target = players[bullet.owner === 1 ? 1 : 0];
+  return target?.health > 0 ? target : null;
+}
+
+function updateHomingDirection(bullet, dt) {
+  if (bullet.homingElapsed >= HOMING_TRACK_DURATION) return;
+  const trackingDt = Math.min(dt, HOMING_TRACK_DURATION - bullet.homingElapsed);
+  bullet.homingElapsed = Math.min(HOMING_TRACK_DURATION, bullet.homingElapsed + dt);
+  const target = getHomingTarget(bullet);
+  if (!target || trackingDt <= 0) return;
+
+  const speed = Math.hypot(bullet.vx, bullet.vy);
+  const currentAngle = Math.atan2(bullet.vy, bullet.vx);
+  const targetAngle = Math.atan2(target.y - bullet.y, target.x - bullet.x);
+  const angleDifference = Math.atan2(
+    Math.sin(targetAngle - currentAngle),
+    Math.cos(targetAngle - currentAngle),
+  );
+  const maxTurn = HOMING_TURN_RATE * trackingDt;
+  const nextAngle = currentAngle + Math.max(-maxTurn, Math.min(maxTurn, angleDifference));
+  bullet.vx = Math.cos(nextAngle) * speed;
+  bullet.vy = Math.sin(nextAngle) * speed;
+}
+
 function updateBullets(dt) {
   for (let i = bullets.length - 1; i >= 0; i -= 1) {
     const bullet = bullets[i];
+    if (bullet.homing) updateHomingDirection(bullet, dt);
     bullet.lastX = bullet.x;
     bullet.lastY = bullet.y;
     bullet.x += bullet.vx * dt;
@@ -954,9 +1222,9 @@ function updateBullets(dt) {
     trails.push({ x1: bullet.lastX, y1: bullet.lastY, x2: bullet.x, y2: bullet.y, color: bullet.color, life: 0.08 });
 
     if (gameMode === "campaign") {
-      if (bullet.owner === 1) {
+      if (typeof bullet.owner === "number") {
         const targetBot = bots.find(
-          (bot) => bot.alive && Math.hypot(bullet.x - bot.x, bullet.y - bot.y) < PLAYER_RADIUS + bullet.radius,
+          (bot) => bot.alive && Math.hypot(bullet.x - bot.x, bullet.y - bot.y) < (bot.radius ?? PLAYER_RADIUS) + bullet.radius,
         );
         if (targetBot) {
           targetBot.health = Math.max(0, targetBot.health - bullet.damage);
@@ -968,14 +1236,18 @@ function updateBullets(dt) {
           if (targetBot.health <= 0) {
             targetBot.alive = false;
             burst(targetBot.x, targetBot.y, targetBot.color, 42, 300);
-            if (bots.every((bot) => !bot.alive)) endCampaign(true);
+            if (bots.every((bot) => !bot.alive)) {
+              if (campaignLevel === 4 && !campaignBossSpawned) spawnCampaignBoss();
+              else endCampaign(true);
+            }
           }
           continue;
         }
       } else {
-        const target = players[0];
-        const hit = Math.hypot(bullet.x - target.x, bullet.y - target.y) < PLAYER_RADIUS + bullet.radius;
-        if (hit) {
+        const target = getCampaignPlayers(true).find(
+          (player) => Math.hypot(bullet.x - player.x, bullet.y - player.y) < PLAYER_RADIUS + bullet.radius,
+        );
+        if (target) {
           if (target.invincibilityTimer > 0) {
             burst(bullet.x, bullet.y, "#b57bff", 14, 260);
             screenShake = Math.max(screenShake, 2);
@@ -988,7 +1260,10 @@ function updateBullets(dt) {
             playTone(75, 0.08, "square", 0.045);
           }
           bullets.splice(i, 1);
-          if (target.health <= 0) endCampaign(false);
+          if (target.health <= 0) {
+            target.homingBuffTimer = 0;
+            if (getCampaignPlayers(true).length === 0) endCampaign(false);
+          }
           continue;
         }
       }
@@ -1008,7 +1283,10 @@ function updateBullets(dt) {
           playTone(75, 0.08, "square", 0.045);
         }
         bullets.splice(i, 1);
-        if (target.health <= 0) endRound(bullet.owner);
+        if (target.health <= 0) {
+          target.homingBuffTimer = 0;
+          endRound(bullet.owner);
+        }
         continue;
       }
     }
@@ -1058,6 +1336,7 @@ function updateEffects(dt) {
 function endRound(winnerId, reason = "knockout") {
   if (state !== "playing") return;
   state = "roundOver";
+  players.forEach((player) => { player.homingBuffTimer = 0; });
   const isDraw = winnerId === 0;
   const winner = isDraw ? null : players[winnerId - 1];
   if (winner) winner.score += 1;
@@ -1084,29 +1363,36 @@ function endRound(winnerId, reason = "knockout") {
 function endCampaign(won) {
   if (state !== "playing") return;
   state = "roundOver";
+  players.forEach((player) => { player.homingBuffTimer = 0; });
   campaignWon = won;
   const completionTime = Number.parseFloat(formatCampaignTime(campaignElapsed));
   let isNewBest = false;
-  const previousBest = campaignBestTimes[campaignLevel];
+  const recordSet = getCampaignRecordSet();
+  const previousBest = recordSet[campaignLevel];
   if (won && (previousBest === null || completionTime < previousBest)) {
-    campaignBestTimes[campaignLevel] = completionTime;
+    recordSet[campaignLevel] = completionTime;
     isNewBest = true;
     try {
-      localStorage.setItem(`arenaDuel.campaignBestLevel${campaignLevel}`, String(completionTime));
+      const storagePrefix = isCampaignCoop()
+        ? "arenaDuel.campaignCoopBestLevel"
+        : "arenaDuel.campaignBestLevel";
+      localStorage.setItem(`${storagePrefix}${campaignLevel}`, String(completionTime));
     } catch {
       // Keep the best time for this session if persistent storage is unavailable.
     }
   }
   UI.resultEyebrow.textContent = won ? "LEVEL COMPLETE" : "CHALLENGE OVER";
-  UI.resultTitle.textContent = won ? `LEVEL ${campaignLevel} CLEARED` : "CAMPAIGN FAILED";
+  UI.resultTitle.textContent = won
+    ? `${isCampaignCoop() ? "CO-OP " : ""}LEVEL ${campaignLevel} CLEARED`
+    : `${isCampaignCoop() ? "CO-OP " : ""}CAMPAIGN FAILED`;
   UI.resultTitle.style.color = won ? "#73ffbc" : "#ff4d8d";
   UI.resultText.textContent = won
-    ? `TIME ${formatCampaignTime(completionTime)} SEC · ${isNewBest ? "NEW BEST TIME" : `BEST ${formatCampaignTime(campaignBestTimes[campaignLevel])} SEC`} · ${campaignLevel < 3 ? `NEXT: LEVEL ${campaignLevel + 1}` : "ALL LEVELS COMPLETE"}`
+    ? `TIME ${formatCampaignTime(completionTime)} SEC · ${isNewBest ? "NEW BEST TIME" : `BEST ${formatCampaignTime(recordSet[campaignLevel])} SEC`} · ${campaignLevel < 4 ? `NEXT: LEVEL ${campaignLevel + 1}` : "ALL LEVELS COMPLETE"}`
     : `Press ${formatKeyCode(keyBindings.global.restart)} or click the button to retry Level ${campaignLevel}`;
-  UI.restartButton.firstChild.textContent = won && campaignLevel < 3 ? "NEXT LEVEL " : won ? "PLAY AGAIN " : "RETRY ";
+  UI.restartButton.firstChild.textContent = won && campaignLevel < 4 ? "NEXT LEVEL " : won ? "PLAY AGAIN " : "RETRY ";
   UI.resultPanel.classList.remove("hidden");
   if (won) {
-    burst(players[0].x, players[0].y, players[0].color, 50, 320);
+    getCampaignPlayers(true).forEach((player) => burst(player.x, player.y, player.color, 50, 320));
     playVictory();
   }
   updateModePresentation();
@@ -1125,7 +1411,7 @@ function endRoundByTime() {
 function continueGame() {
   if (state !== "roundOver") return;
   if (gameMode === "campaign") {
-    startCampaignLevel(campaignWon && campaignLevel < 3 ? campaignLevel + 1 : campaignLevel);
+    startCampaignLevel(campaignWon && campaignLevel < 4 ? campaignLevel + 1 : campaignLevel);
     return;
   }
   const matchOver = players.some((player) => player.score >= WIN_SCORE);
@@ -1158,7 +1444,9 @@ function updateUI() {
     UI[`${prefix}Ammo`].textContent = `${weaponState.ammo} / ${currentWeapon(player).magSize}`;
     UI[`${prefix}Weapon`].textContent = currentWeapon(player).name;
     UI[`${prefix}Score`].textContent = player.score;
-    UI[`${prefix}Status`].textContent = player.invincibilityTimer > 0
+    UI[`${prefix}Status`].textContent = player.health <= 0
+      ? "DOWN"
+      : player.invincibilityTimer > 0
       ? `INVINCIBLE ${player.invincibilityTimer.toFixed(1)}s`
       : weaponState.reloading
       ? `RELOADING ${(Math.max(0, weaponState.reloadTimer)).toFixed(1)}s`
@@ -1166,50 +1454,92 @@ function updateUI() {
         ? `DAMAGE BOOST ${player.damageBuffTimer.toFixed(1)}s · 150%`
       : player.speedBuffTimer > 0
         ? `SPEED BOOST ${player.speedBuffTimer.toFixed(1)}s · 120%`
+      : player.homingBuffTimer > 0
+        ? `HOMING BULLETS ${player.homingBuffTimer.toFixed(1)}s · 50%`
       : player.health <= 30
         ? "CRITICAL HEALTH"
         : "READY";
     UI[`${prefix}Health`].style.filter = player.health <= 30 ? "saturate(.5) brightness(1.4)" : "";
   });
+  UI.coopP2Health.style.width = UI.p2Health.style.width;
+  UI.coopP2Health.style.filter = UI.p2Health.style.filter;
+  UI.coopP2HealthText.textContent = UI.p2HealthText.textContent;
+  UI.coopP2Ammo.textContent = UI.p2Ammo.textContent;
+  UI.coopP2Weapon.textContent = UI.p2Weapon.textContent;
+  UI.coopP2Status.textContent = UI.p2Status.textContent;
+  UI.coopP2Score.textContent = UI.p2Score.textContent;
   if (gameMode === "campaign") {
     const aliveBots = bots.filter((bot) => bot.alive).length;
     const totalBotHealth = bots.reduce((total, bot) => total + bot.health, 0);
+    const totalBotMaxHealth = bots.reduce((total, bot) => total + bot.maxHealth, 0);
     const [greenBot, yellowBot] = bots;
     const botAmmoText = bots.map((bot) => {
+      if (bot.isBoss) {
+        const greenAmmo = bot.reloading
+          ? `G RELOAD ${Math.max(0, bot.reloadTimer).toFixed(1)}s`
+          : `G ${bot.ammo}/${weapons[bot.weaponIndex].magSize}`;
+        const shotgunAmmo = bot.shotgunReloading
+          ? `SG RELOAD ${Math.max(0, bot.shotgunReloadTimer).toFixed(1)}s`
+          : `SG ${bot.shotgunAmmo}/${weapons[2].magSize}`;
+        return `${greenAmmo} · ${shotgunAmmo}`;
+      }
       const shortName = bot.id === "bot-green"
         ? "G"
         : bot.id === "bot-yellow"
           ? campaignLevel === 1 ? "Y" : "Y1"
-          : bot.id === "bot-yellow-2" ? "Y2" : "SG";
+          : bot.id === "bot-yellow-2"
+            ? "Y2"
+            : bot.id === "bot-shotgun-1" ? "SG1" : bot.id === "bot-shotgun-2" ? "SG2" : "SG";
       return bot.reloading
         ? `${shortName} RELOAD ${Math.max(0, bot.reloadTimer).toFixed(1)}s`
         : `${shortName} ${bot.ammo}/${weapons[bot.weaponIndex].magSize}`;
     }).join(" · ");
-    const shotgunBot = bots.find((bot) => bot.id === "bot-shotgun");
+    const shotgunBot = bots.find((bot) => bot.weaponIndex === 2);
+    const boss = bots.find((bot) => bot.isBoss);
     UI.p1Tag.textContent = "P1";
     UI.p1Score.textContent = campaignLevel;
+    UI.coopP2Score.textContent = campaignLevel;
     UI.p2Tag.textContent = "AI";
-    UI.p2Weapon.textContent = campaignLevel === 3 ? "AI SQUAD + SHOTGUN" : `AI SQUAD × ${bots.length}`;
+    UI.p2Weapon.textContent = campaignLevel === 4
+      ? campaignBossSpawned ? "ARENA BOSS" : "SHOTGUN GUARDS × 2"
+      : campaignLevel === 3 ? "AI SQUAD + SHOTGUN" : `AI SQUAD × ${bots.length}`;
     UI.p2Score.textContent = aliveBots;
-    UI.p2Health.style.width = `${(totalBotHealth / (BOT_HEALTH * bots.length)) * 100}%`;
-    UI.p2HealthText.textContent = `${aliveBots} / ${bots.length}`;
+    UI.p2Health.style.width = `${totalBotMaxHealth > 0 ? (totalBotHealth / totalBotMaxHealth) * 100 : 0}%`;
+    UI.p2Health.style.filter = "";
+    UI.p2HealthText.textContent = `${Math.ceil(totalBotHealth)} / ${totalBotMaxHealth}`;
     UI.p2Ammo.textContent = botAmmoText;
-    UI.p2Status.textContent = aliveBots > 0 ? `${aliveBots} AI · EACH FIRES EVERY 2 SEC` : "AREA CLEARED";
-    UI.roundLabel.textContent = `LEVEL ${campaignLevel}`;
+    UI.p2Status.textContent = boss
+      ? "BOSS · GREEN 2 SEC · SHOTGUN 5 SEC"
+      : aliveBots > 0 ? `${aliveBots} AI · EACH FIRES EVERY 2 SEC` : "AREA CLEARED";
+    UI.roundLabel.textContent = isCampaignCoop()
+      ? `LEVEL ${campaignLevel} · AI ${aliveBots}/${bots.length}`
+      : `LEVEL ${campaignLevel}`;
     UI.matchTimer.textContent = `${formatCampaignTime(campaignElapsed)}s`;
     UI.matchTimer.style.color = "#ffcf44";
     UI.arenaFrame.dataset.gameMode = "campaign";
     UI.arenaFrame.dataset.campaignLevel = String(campaignLevel);
+    UI.arenaFrame.dataset.campaignPlayers = String(campaignPlayerCount);
+    UI.arenaFrame.dataset.campaignVariant = isCampaignCoop() ? "coop" : "solo";
+    UI.arenaFrame.dataset.botHealthMultiplier = isCampaignCoop() ? "2" : "1";
+    UI.arenaFrame.dataset.maxBotHealth = String(bots[0]?.maxHealth ?? BOT_HEALTH);
     UI.arenaFrame.dataset.totalBots = String(bots.length);
     UI.arenaFrame.dataset.elapsed = formatCampaignTime(campaignElapsed);
     UI.arenaFrame.dataset.remainingBots = String(aliveBots);
+    UI.arenaFrame.dataset.campaignPhase = campaignLevel === 4
+      ? campaignBossSpawned ? "boss" : "guards"
+      : "standard";
+    UI.arenaFrame.dataset.bossSpawned = String(campaignBossSpawned);
+    UI.arenaFrame.dataset.bossHealth = String(boss?.health ?? 0);
+    UI.arenaFrame.dataset.bossMaxHealth = String(boss?.maxHealth ?? 0);
+    UI.arenaFrame.dataset.bossGreenShotsFired = String(boss?.shotsFired ?? 0);
+    UI.arenaFrame.dataset.bossShotgunShotsFired = String(boss?.shotgunShotsFired ?? 0);
     UI.arenaFrame.dataset.botShotsFired = String(campaignShotsFired);
-    UI.arenaFrame.dataset.greenShotsFired = String(greenBot.shotsFired);
-    UI.arenaFrame.dataset.yellowShotsFired = String(yellowBot.shotsFired);
-    UI.arenaFrame.dataset.greenAmmo = String(greenBot.ammo);
-    UI.arenaFrame.dataset.yellowAmmo = String(yellowBot.ammo);
-    UI.arenaFrame.dataset.greenReloading = String(greenBot.reloading);
-    UI.arenaFrame.dataset.yellowReloading = String(yellowBot.reloading);
+    UI.arenaFrame.dataset.greenShotsFired = String(greenBot?.shotsFired ?? 0);
+    UI.arenaFrame.dataset.yellowShotsFired = String(yellowBot?.shotsFired ?? 0);
+    UI.arenaFrame.dataset.greenAmmo = String(greenBot?.ammo ?? 0);
+    UI.arenaFrame.dataset.yellowAmmo = String(yellowBot?.ammo ?? 0);
+    UI.arenaFrame.dataset.greenReloading = String(greenBot?.reloading ?? false);
+    UI.arenaFrame.dataset.yellowReloading = String(yellowBot?.reloading ?? false);
     UI.arenaFrame.dataset.shotgunShotsFired = String(shotgunBot?.shotsFired ?? 0);
     UI.arenaFrame.dataset.shotgunAmmo = String(shotgunBot?.ammo ?? 0);
     UI.arenaFrame.dataset.controlScheme = "custom";
@@ -1222,6 +1552,12 @@ function updateUI() {
     UI.matchTimer.style.color = seconds <= 10 ? "#ff4d8d" : "";
     UI.arenaFrame.dataset.gameMode = "duel";
     delete UI.arenaFrame.dataset.remainingBots;
+    delete UI.arenaFrame.dataset.campaignPhase;
+    delete UI.arenaFrame.dataset.bossSpawned;
+    delete UI.arenaFrame.dataset.bossHealth;
+    delete UI.arenaFrame.dataset.bossMaxHealth;
+    delete UI.arenaFrame.dataset.bossGreenShotsFired;
+    delete UI.arenaFrame.dataset.bossShotgunShotsFired;
     delete UI.arenaFrame.dataset.botShotsFired;
     delete UI.arenaFrame.dataset.greenShotsFired;
     delete UI.arenaFrame.dataset.yellowShotsFired;
@@ -1230,6 +1566,10 @@ function updateUI() {
     delete UI.arenaFrame.dataset.greenReloading;
     delete UI.arenaFrame.dataset.yellowReloading;
     delete UI.arenaFrame.dataset.campaignLevel;
+    delete UI.arenaFrame.dataset.campaignPlayers;
+    delete UI.arenaFrame.dataset.campaignVariant;
+    delete UI.arenaFrame.dataset.botHealthMultiplier;
+    delete UI.arenaFrame.dataset.maxBotHealth;
     delete UI.arenaFrame.dataset.totalBots;
     delete UI.arenaFrame.dataset.shotgunShotsFired;
     delete UI.arenaFrame.dataset.shotgunAmmo;
@@ -1435,10 +1775,13 @@ function drawPlayer(player, time) {
 
 function drawBot(bot, time) {
   if (!bot.alive) return;
+  const radius = bot.radius ?? PLAYER_RADIUS;
+  const sizeScale = radius / PLAYER_RADIUS;
   const pulse = 1 + Math.sin(time * 0.006 + bot.y) * 0.05;
   ctx.save();
   ctx.translate(bot.x, bot.y);
   ctx.rotate(bot.angle);
+  ctx.scale(sizeScale, sizeScale);
 
   ctx.globalAlpha = 0.16;
   ctx.fillStyle = bot.color;
@@ -1477,21 +1820,25 @@ function drawBot(bot, time) {
 
   ctx.save();
   ctx.textAlign = "center";
-  ctx.font = "700 11px Chakra Petch, sans-serif";
+  ctx.font = `700 ${bot.isBoss ? 15 : 11}px Chakra Petch, sans-serif`;
   ctx.fillStyle = bot.color;
-  ctx.fillText(bot.label, bot.x, bot.y - 42);
+  ctx.fillText(bot.label, bot.x, bot.y - radius - 17);
+  const healthBarWidth = bot.isBoss ? 112 : 56;
+  const healthBarY = bot.y + radius + 9;
   ctx.fillStyle = "rgba(0,0,0,.7)";
-  ctx.fillRect(bot.x - 28, bot.y + 34, 56, 5);
+  ctx.fillRect(bot.x - healthBarWidth / 2, healthBarY, healthBarWidth, 5);
   ctx.fillStyle = bot.color;
-  ctx.fillRect(bot.x - 28, bot.y + 34, 56 * (bot.health / BOT_HEALTH), 5);
+  ctx.fillRect(bot.x - healthBarWidth / 2, healthBarY, healthBarWidth * (bot.health / bot.maxHealth), 5);
   ctx.font = "700 9px Chakra Petch, sans-serif";
   ctx.fillStyle = bot.reloading ? "#ffffff" : bot.color;
   ctx.fillText(
-    bot.reloading
+    bot.isBoss
+      ? `G ${bot.reloading ? "RELOAD" : `${bot.ammo}/${weapons[bot.weaponIndex].magSize}`} · SG ${bot.shotgunReloading ? "RELOAD" : `${bot.shotgunAmmo}/${weapons[2].magSize}`}`
+      : bot.reloading
       ? `RELOAD ${Math.max(0, bot.reloadTimer).toFixed(1)}s`
       : `${bot.ammo} / ${weapons[bot.weaponIndex].magSize}`,
     bot.x,
-    bot.y + 53,
+    healthBarY + 19,
   );
   ctx.restore();
 }
@@ -1500,7 +1847,14 @@ function drawPickup(pickup, time) {
   const isMedkit = pickup.type === "medkit";
   const isDamage = pickup.type === "damage";
   const isInvincible = pickup.type === "invincible";
-  const color = isMedkit ? "#55f59b" : isDamage ? "#ffb13b" : isInvincible ? "#b57bff" : "#56a8ff";
+  const isHoming = pickup.type === "homing";
+  const color = isMedkit
+    ? "#55f59b"
+    : isDamage
+      ? "#ffb13b"
+      : isInvincible
+        ? "#b57bff"
+        : isHoming ? HOMING_COLOR : "#56a8ff";
   const bob = Math.sin(time * 0.004 + pickup.x) * 4;
   const pulse = 1 + Math.sin(time * 0.007 + pickup.y) * 0.09;
 
@@ -1550,6 +1904,22 @@ function drawPickup(pickup, time) {
     ctx.lineTo(-11, -7);
     ctx.closePath();
     ctx.fill();
+  } else if (isHoming) {
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, -1.2, 1.1);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(8, 11);
+    ctx.lineTo(14, 10);
+    ctx.lineTo(12, 4);
+    ctx.closePath();
+    ctx.fill();
   } else {
     ctx.beginPath();
     ctx.moveTo(-12, 5);
@@ -1570,7 +1940,13 @@ function drawPickup(pickup, time) {
   ctx.font = "700 10px Noto Sans SC, sans-serif";
   ctx.fillStyle = color;
   ctx.fillText(
-    isMedkit ? "+30 HEALTH" : isDamage ? "150% DAMAGE" : isInvincible ? "5s SHIELD" : "120% SPEED",
+    isMedkit
+      ? "+30 HEALTH"
+      : isDamage
+        ? "150% DAMAGE"
+        : isInvincible
+          ? "5s SHIELD"
+          : isHoming ? "HOMING BULLETS" : "120% SPEED",
     pickup.x,
     pickup.y + bob + 34,
   );
@@ -1595,7 +1971,7 @@ function drawEffects() {
 
   bullets.forEach((bullet) => {
     ctx.save();
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = bullet.homing ? HOMING_COLOR : "#fff";
     ctx.shadowColor = bullet.color;
     ctx.shadowBlur = 14;
     ctx.beginPath();
@@ -1625,7 +2001,7 @@ function render(time) {
   pickups.forEach((pickup) => drawPickup(pickup, time));
   drawEffects();
   if (gameMode === "campaign") {
-    drawPlayer(players[0], time);
+    getCampaignPlayers(true).forEach((player) => drawPlayer(player, time));
     bots.forEach((bot) => drawBot(bot, time));
   } else {
     players.forEach((player) => drawPlayer(player, time));
@@ -1666,7 +2042,7 @@ function loop(now) {
     if (state === "playing") {
       if (gameMode === "campaign") {
         campaignElapsed += dt;
-        updatePlayer(players[0], dt);
+        getCampaignPlayers(true).forEach((player) => updatePlayer(player, dt));
         updateBots(dt);
       } else {
         roundTimer = Math.max(0, roundTimer - dt);
@@ -1684,10 +2060,11 @@ function loop(now) {
 }
 
 function handleInputPress(inputCode) {
+  const p2Enabled = gameMode === "duel" || (gameMode === "campaign" && isCampaignCoop());
   if (inputCode === players[0].switchKey) switchWeapon(players[0]);
-  if (gameMode === "duel" && inputCode === players[1].switchKey) switchWeapon(players[1]);
+  if (p2Enabled && inputCode === players[1].switchKey) switchWeapon(players[1]);
   if (inputCode === players[0].reloadKey) beginReload(players[0]);
-  if (gameMode === "duel" && inputCode === players[1].reloadKey) beginReload(players[1]);
+  if (p2Enabled && inputCode === players[1].reloadKey) beginReload(players[1]);
   if (inputCode === keyBindings.global.restart) {
     if (gameMode === "campaign") startCampaignLevel(campaignLevel);
     else continueGame();
@@ -1766,9 +2143,12 @@ UI.closeModeButton.addEventListener("click", closeModePanel);
 UI.duelModeButton.addEventListener("click", startMatch);
 UI.campaignModeButton.addEventListener("click", showLevelSelect);
 UI.backModeButton.addEventListener("click", showModeHome);
+UI.campaignSoloButton.addEventListener("click", () => selectCampaignPlayerCount(1));
+UI.campaignCoopButton.addEventListener("click", () => selectCampaignPlayerCount(2));
 UI.level1Button.addEventListener("click", () => startCampaignLevel(1));
 UI.level2Button.addEventListener("click", () => startCampaignLevel(2));
 UI.level3Button.addEventListener("click", () => startCampaignLevel(3));
+UI.level4Button.addEventListener("click", () => startCampaignLevel(4));
 UI.soundButton.addEventListener("click", () => {
   soundEnabled = !soundEnabled;
   UI.soundButton.textContent = `SOUND: ${soundEnabled ? "ON" : "OFF"}`;

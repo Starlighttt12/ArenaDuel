@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080b14" />
     <title>Arena Duel · Duel & Campaign</title>
-    <link rel="stylesheet" href="./styles.css?v=15" />
+    <link rel="stylesheet" href="./styles.css?v=22" />
   </head>
   <body>
     <main class="game-shell">
@@ -31,18 +31,37 @@
 
       <section class="hud" aria-label="Player status">
         <article class="player-card player-one">
-          <div class="player-heading">
-            <span id="p1Tag" class="player-tag">P1</span>
-            <span id="p1Weapon" class="weapon-name">Pulse Pistol</span>
-            <span id="p1Score" class="score">0</span>
-          </div>
-          <div class="health-track">
-            <div id="p1Health" class="health-fill"></div>
-            <span id="p1HealthText" class="health-text">100%</span>
-          </div>
-          <div class="ammo-row">
-            <span id="p1Status">READY</span>
-            <strong id="p1Ammo">12 / ∞</strong>
+          <div class="team-player-panels">
+            <div class="team-player-panel">
+              <div class="player-heading">
+                <span id="p1Tag" class="player-tag">P1</span>
+                <span id="p1Weapon" class="weapon-name">Pulse Pistol</span>
+                <span id="p1Score" class="score">0</span>
+              </div>
+              <div class="health-track">
+                <div id="p1Health" class="health-fill"></div>
+                <span id="p1HealthText" class="health-text">100%</span>
+              </div>
+              <div class="ammo-row">
+                <span id="p1Status">READY</span>
+                <strong id="p1Ammo">12 / ∞</strong>
+              </div>
+            </div>
+            <div id="coopP2Hud" class="team-player-panel coop-p2-hud" aria-label="Player 2 status">
+              <div class="player-heading">
+                <span class="player-tag">P2</span>
+                <span id="coopP2Weapon" class="weapon-name">Pulse Pistol</span>
+                <span id="coopP2Score" class="score">0</span>
+              </div>
+              <div class="health-track">
+                <div id="coopP2Health" class="health-fill"></div>
+                <span id="coopP2HealthText" class="health-text">100%</span>
+              </div>
+              <div class="ammo-row">
+                <span id="coopP2Status">READY</span>
+                <strong id="coopP2Ammo">12 / ∞</strong>
+              </div>
+            </div>
           </div>
         </article>
 
@@ -83,15 +102,26 @@
                   <small>First to 3 wins</small>
                 </button>
                 <button id="campaignModeButton" class="mode-card level-card" type="button">
-                  <span>SOLO CHALLENGE</span>
+                  <span>SOLO / 2P CO-OP</span>
                   <strong>CAMPAIGN</strong>
-                  <small>Choose a level</small>
+                  <small>Choose players, then choose a level</small>
                 </button>
               </div>
             </div>
             <div id="levelSelect" class="hidden">
               <p class="mode-eyebrow">CAMPAIGN</p>
               <h2>CHOOSE CAMPAIGN LEVEL</h2>
+              <div class="campaign-player-select" aria-label="Campaign player count">
+                <button id="campaignSoloButton" class="campaign-player-button is-active" type="button" aria-pressed="true">
+                  <strong>SOLO</strong>
+                  <small>1 PLAYER · NORMAL AI HEALTH</small>
+                </button>
+                <button id="campaignCoopButton" class="campaign-player-button" type="button" aria-pressed="false">
+                  <strong>2P CO-OP</strong>
+                  <small>2 PLAYERS · AI HEALTH ×2</small>
+                </button>
+              </div>
+              <p id="campaignPlayerSummary" class="campaign-player-summary">SOLO RECORDS · P1 CONTROLS</p>
               <div class="mode-options level-options">
                 <button id="level1Button" class="mode-card level-card" type="button">
                   <span>LEVEL 1</span>
@@ -110,6 +140,12 @@
                   <strong>SHOTGUN LOCKDOWN</strong>
                   <small>Add one Shotgun AI</small>
                   <small id="level3Best" class="best-time">BEST: --</small>
+                </button>
+                <button id="level4Button" class="mode-card level-card" type="button">
+                  <span>LEVEL 4</span>
+                  <strong>FINAL SIEGE</strong>
+                  <small>2 Shotgun AI → Boss</small>
+                  <small id="level4Best" class="best-time">BEST: --</small>
                 </button>
               </div>
               <button id="backModeButton" class="close-mode-button" type="button">← BACK TO MODE SELECT</button>
@@ -195,6 +231,6 @@
       </section>
     </main>
 
-    <script src="./game.js?v=15"></script>
+    <script src="./game.js?v=21"></script>
   </body>
 </html>

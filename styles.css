@@ -152,6 +152,24 @@ button {
   min-width: 0;
 }
 
+.team-player-panels {
+  display: flex;
+  gap: 12px;
+}
+
+.team-player-panel {
+  min-width: 0;
+  flex: 1;
+}
+
+.coop-p2-hud {
+  display: none;
+}
+
+.hud.campaign-coop .coop-p2-hud {
+  display: block;
+}
+
 .player-heading,
 .ammo-row {
   display: flex;
@@ -252,6 +270,36 @@ button {
 .player-two .health-fill {
   background: linear-gradient(90deg, var(--p2), #aa245b);
   box-shadow: 0 0 14px var(--p2);
+}
+
+.coop-p2-hud .player-tag {
+  color: var(--p2);
+}
+
+.coop-p2-hud .health-track {
+  transform: skew(-10deg);
+}
+
+.coop-p2-hud .health-text {
+  right: 7px;
+  left: auto;
+  transform: translateY(-50%) skew(10deg);
+}
+
+.coop-p2-hud .health-fill {
+  margin-left: 0;
+  background: linear-gradient(90deg, #aa245b, var(--p2));
+  box-shadow: 0 0 14px var(--p2);
+}
+
+.hud.campaign-mode .player-two .player-tag,
+.hud.campaign-mode .player-two .score {
+  color: var(--yellow);
+}
+
+.hud.campaign-mode .player-two .health-fill {
+  background: linear-gradient(90deg, #d99e18, var(--yellow));
+  box-shadow: 0 0 14px rgba(255, 207, 68, .75);
 }
 
 .ammo-row {
@@ -526,6 +574,64 @@ canvas {
   font-size: clamp(28px, 4vw, 48px);
 }
 
+.campaign-player-select {
+  display: grid;
+  width: min(560px, 100%);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: -8px auto 8px;
+}
+
+.campaign-player-button {
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 6px;
+  background: rgba(255,255,255,.035);
+  padding: 9px 12px;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.campaign-player-button strong,
+.campaign-player-button small {
+  display: block;
+}
+
+.campaign-player-button strong {
+  color: #d8ddea;
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 14px;
+}
+
+.campaign-player-button small {
+  margin-top: 2px;
+  color: #697287;
+  font-size: 8px;
+  letter-spacing: .06em;
+}
+
+.campaign-player-button:hover,
+.campaign-player-button:focus-visible,
+.campaign-player-button.is-active {
+  border-color: var(--yellow);
+  background: rgba(255,207,68,.1);
+  outline: none;
+}
+
+.campaign-player-button.is-active strong {
+  color: var(--yellow);
+}
+
+.campaign-player-summary {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-family: "Chakra Petch", sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .11em;
+  text-align: center;
+}
+
 .mode-options {
   display: grid;
   gap: 12px;
@@ -537,7 +643,7 @@ canvas {
 }
 
 .level-options {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .mode-card {
@@ -813,7 +919,7 @@ kbd {
   }
 
   .level-options {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .controls {
